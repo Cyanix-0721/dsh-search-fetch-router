@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # The host packages are peer dependencies that DSH itself provides at
+      # runtime. CI only needs them so the modules resolve at import time.
+      #
+      # ⚠️ Pin the `next` dist-tag, NOT `latest`: on npm the `latest` tag of
+      # these packages still points at the ancient 0.0.1-rc.1 line, which
+      # depends on `@deepseek-ai/dsh-environment` — a package that has been
+      # unpublished, so installing `@latest` fails with E404. The line this
+      # plugin targets lives on `next`.
+      - name: Install host packages for tests
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            @deepseek-ai/dsh-web@next \
+            @deepseek-ai/dsh-launch-environment@next \
+            @deepseek-ai/dsh-credentials@next \
+            @deepseek-ai/dsh-web-fetch-http@next \
+            @deepseek-ai/dsh-web-search-deepseek@next \
+            @deepseek-ai/dsh-settings@next \
+            @deepseek-ai/schemastery@latest
+
+      - name: Run tests
+        run: npm test
