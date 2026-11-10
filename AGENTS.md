@@ -31,6 +31,17 @@ provider id 是 `search-fetch-router`，搜索与抓取共用（seam 存两张�
    配置里的 ref 名数组，不是服务。不要试图「扫出所有 TAVILY_API_KEY_*」。
 7. **先解析 key，再决策链。** 默认 ref 名永远存在，用「ref 名数」判断可用性会恒真，
    于是「一个 key 都没填」被当成「有 Tavily」，最后报一串看不懂的后端失败。
+8. **client bundle 的 `__ModuleLoader__.load({id})` 必须等于包名**（`dsh-search-fetch-router`），
+   不是 patch 里的行 id。`dsh-client-modules` 用**包名**做 graph 行 id，并校验 chunk URL 是
+   `${id}/client.js`；写错 id 就静默不加载。
+9. **`plugins.detail.section` 是 list 座位，任何插件页都会渲染它**，组件必须自判
+   `props.subject.kind === 'bundle' && props.subject.pkg.name === 'dsh-search-fetch-router'`，
+   否则卡片会串到别人的插件页上。座位注册要带 `id`、不声明 `inject`。
+10. **client bundle 只能 `require` 种子模块**（`react` / `react-dom` /
+    `@deepseek-ai/dsh-client-ui-primitives` 等 9 个），手写 `React.createElement`、无 JSX、无构建。
+    要别的宿主模块必须在 `dsh.client.inject` 里声明——但本项目只用种子，保持零 inject。
+11. **密钥卡片只走 `ctx.remote.credentials.set/describe`**，值落 `~/.dsh/.credentials.yaml`。
+    别改成自己发 HTTP 或用 `cordis.patch.yml` 存值，那就把「是否进 YAML」的初衷丢了。
 
 ## 目录
 
@@ -46,6 +57,7 @@ lib/firecrawl.js      /v2/scrape 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
 lib/execute.js        执行层：把决策落到调用上，失败降级
+lib/client.js         零构建浏览器设置卡：填 Tavily / Firecrawl 的 key（写 credentials）
 test/*.test.js        node --test，无框架依赖
 ```
 

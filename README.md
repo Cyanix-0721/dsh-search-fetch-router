@@ -70,9 +70,12 @@ records: {}
 export TAVILY_API_KEY=tvly-...
 ```
 
-The host's own credential UI covers model-provider keys; an arbitrary reference name
-like `TAVILY_API_KEY` has no button, so edit the `refs:` block directly. The file is
-already 0600 and the host refuses to start if that ever widens.
+The easiest way to fill these in is the **API keys** card this plugin adds to its own
+page under **插件 / Plugins** — one password field per reference name, saved straight to
+the DSH credentials store. Values still never touch a YAML file. If you would rather edit
+by hand, the block above works too. (The host's built-in credential UI only covers
+model-provider keys, so an arbitrary name like `TAVILY_API_KEY` has no button there;
+the file is already 0600 and the host refuses to start if that ever widens.)
 
 The credentials store wins over the environment. Reference names must be valid shell
 identifiers (`[A-Za-z_][A-Za-z0-9_]*`); a malformed name is treated as "not configured"
@@ -101,8 +104,12 @@ If you want quota-aware scheduling, use `dsh-tavily-pool` instead.
 
 ## Settings
 
-Every field is exposed through the host's auto-generated settings form — there is no
-custom panel and no client-side build.
+The tuning fields are exposed through the host's auto-generated settings form. On top of
+that, this plugin ships one tiny, **zero-build** browser bundle (`lib/client.js`) that adds
+an **API keys** card to its plugin page for filling the Tavily / Firecrawl secrets. The
+card only writes to the credentials store through the host's `remote.credentials` API — it
+never stores a value in a config file. Every tuning field is `volatile`, so changes apply
+live.
 
 | Field | Default | Meaning |
 | --- | --- | --- |
