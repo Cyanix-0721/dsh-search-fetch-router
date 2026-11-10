@@ -102,21 +102,35 @@ function fakeContext(configValue) {
   return { ctx, registrations, state };
 }
 
-/** Recursively expand function components and collect every secret field. */
-function collectSecretFields(node, out = []) {
+/** Recursively expand function components into a flat list of host elements. */
+function flatten(node, out = []) {
   if (node == null || typeof node !== 'object') return out;
   if (Array.isArray(node)) {
-    for (const child of node) collectSecretFields(child, out);
+    for (const child of node) flatten(child, out);
     return out;
   }
   if (typeof node.type === 'function') {
-    collectSecretFields(node.type(node.props), out);
+    flatten(node.type(node.props), out);
     return out;
   }
-  if (node.type === 'SettingsSecretField') out.push(node.props);
-  collectSecretFields(node.children, out);
-  collectSecretFields(node.props?.children, out);
+  out.push(node);
+  flatten(node.children, out);
+  flatten(node.props?.children, out);
   return out;
+}
+
+/** Every key input in the rendered tree. */
+function collectKeyInputs(tree) {
+  return flatten(tree).filter(
+    (node) => node.type === 'input' && node.props?.['data-sfr-key'] !== undefined,
+  );
+}
+
+/** Every button in the rendered tree that carries an aria-label. */
+function collectButtons(tree) {
+  return flatten(tree).filter(
+    (node) => node.type === 'button' && node.props?.['aria-label'] !== undefined,
+  );
 }
 
 const DEFAULT_CONFIG = {
@@ -194,9 +208,12 @@ test('client: the card renders a field per configured reference', () => {
   // title, description, tavily group, firecrawl group, note
   assert.equal(children.length, 5);
 
-  const secretFields = collectSecretFields(tree);
-  const labels = secretFields.map((field) => field.label).sort();
+  const inputs = collectKeyInputs(tree);
+  const labels = inputs.map((field) => field.props['data-sfr-key']).sort();
   assert.deepEqual(labels, ['FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
+  // Nothing is being typed yet, so no field should be revealed and no eye button exists.
+  assert.ok(inputs.every((field) => field.props.type === 'password'));
+  assert.equal(collectButtons(tree).length, 0);
 });
 
 test('client: falls back to the default reference names on a loading snapshot', () => {
@@ -209,9 +226,55 @@ test('client: falls back to the default reference names on a loading snapshot', 
     subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } },
   });
   const tree = element.type(element.props);
-  const secretFields = collectSecretFields(tree);
+  const inputs = collectKeyInputs(tree);
   assert.deepEqual(
-    secretFields.map((field) => field.label).sort(),
+    inputs.map((field) => field.props['data-sfr-key']).sort(),
     ['FIRECRAWL_API_KEY', 'TAVILY_API_KEY'],
   );
+});
+
+test('client: the eye toggle only appears once there is a draft to reveal', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { KeyField } = exported.__test;
+  const t = (key) => key;
+  const base = { t, reference: 'TAVILY_API_KEY', status: { configured: false, writable: true, busy: false }, onEdit: () => {}, onSave: () => {} };
+
+  // Empty draft: masked input, no eye button.
+  const empty = KeyField({ ...base, draft: '' });
+  const emptyInputs = collectKeyInputs(empty);
+  assert.equal(emptyInputs.length, 1);
+  assert.equal(emptyInputs[0].props.type, 'password');
+  assert.equal(collectButtons(empty).length, 0, 'no eye button without a draft');
+
+  // A typed, unsaved draft: value echoed, still masked, eye button present and labelled.
+  const typed = KeyField({ ...base, draft: 'tvly-partial' });
+  const typedInputs = collectKeyInputs(typed);
+  assert.equal(typedInputs[0].props.type, 'password', 'masked until the eye is clicked');
+  assert.equal(typedInputs[0].props.value, 'tvly-partial');
+  const buttons = collectButtons(typed);
+  assert.equal(buttons.length, 1);
+  assert.equal(buttons[0].props['aria-label'], 'show');
+  assert.equal(typeof buttons[0].props.onClick, 'function');
+});
+
+test('client: a busy field disables the input and the save button', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { KeyField } = exported.__test;
+  const t = (key) => key;
+  const tree = KeyField({
+    t,
+    reference: 'FIRECRAWL_API_KEY',
+    status: { configured: true, writable: true, busy: true },
+    draft: 'fc-partial',
+    onEdit: () => {},
+    onSave: () => {},
+  });
+  assert.equal(collectKeyInputs(tree)[0].props.disabled, true);
+  const saveButtons = flatten(tree).filter(
+    (node) => node.type === 'button' && node.props?.['aria-label'] === undefined,
+  );
+  assert.equal(saveButtons.length, 1);
+  assert.equal(saveButtons[0].props.disabled, true, 'save stays disabled while busy');
 });

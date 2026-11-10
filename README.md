@@ -106,7 +106,9 @@ If you want quota-aware scheduling, use `dsh-tavily-pool` instead.
 
 The tuning fields are exposed through the host's auto-generated settings form. On top of
 that, this plugin ships one tiny, **zero-build** browser bundle (`lib/client.js`) that adds
-an **API keys** card to its plugin page for filling the Tavily / Firecrawl secrets. The
+an **API keys** card to its plugin page for filling the Tavily / Firecrawl secrets. An eye
+button reveals the value you are currently typing (still unsaved); a stored secret is never
+read back. The
 card only writes to the credentials store through the host's `remote.credentials` API — it
 never stores a value in a config file. Every tuning field is `volatile`, so changes apply
 live.
