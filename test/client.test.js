@@ -60,13 +60,19 @@ function loadBundle() {
 }
 
 /** A fake ctx that records slot registrations and locale dictionaries. */
-function fakeContext(configValue) {
+function fakeContext(configValue, options = {}) {
   const registrations = [];
-  const state = { dicts: null, injected: [] };
+  const state = { dicts: null, injected: [], mutations: [] };
   const configForm = {
-    getSnapshot: () => ({ value: configValue }),
+    getSnapshot: () => ({ value: configValue, revision: 0 }),
     subscribe: () => () => {},
   };
+  if (options.mutate !== false) {
+    configForm.mutate = async (ops) => {
+      state.mutations.push(ops);
+      return true;
+    };
+  }
   const ctx = {
     effect: (fn) => fn(),
     locale: {
@@ -213,7 +219,11 @@ test('client: the card renders a field per configured reference', () => {
   assert.deepEqual(labels, ['FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
   // Nothing is being typed yet, so no field should be revealed and no eye button exists.
   assert.ok(inputs.every((field) => field.props.type === 'password'));
-  assert.equal(collectButtons(tree).length, 0);
+  // A group with more than one reference gets a per-row remove button; a single-row
+  // group must not — you can never delete your last account.
+  const removeButtons = collectButtons(tree);
+  assert.equal(removeButtons.length, 2);
+  assert.ok(removeButtons.every((button) => button.props['aria-label'] === 'Remove'));
 });
 
 test('client: falls back to the default reference names on a loading snapshot', () => {
@@ -277,4 +287,95 @@ test('client: a busy field disables the input and the save button', () => {
   );
   assert.equal(saveButtons.length, 1);
   assert.equal(saveButtons[0].props.disabled, true, 'save stays disabled while busy');
+});
+
+/** Every "Add account" button (one per group). */
+function collectAddButtons(tree) {
+  return flatten(tree).filter(
+    (node) => node.type === 'button' && Array.isArray(node.children) && node.children.includes('Add account'),
+  );
+}
+
+test('client: nextRefName picks the first free suffixed name', () => {
+  const { captured, require } = loadBundle();
+  const { nextRefName } = captured.factory(require).__test;
+  assert.equal(nextRefName([], 'TAVILY_API_KEY'), 'TAVILY_API_KEY');
+  assert.equal(nextRefName(['TAVILY_API_KEY'], 'TAVILY_API_KEY'), 'TAVILY_API_KEY_2');
+  assert.equal(
+    nextRefName(['TAVILY_API_KEY', 'TAVILY_API_KEY_2'], 'TAVILY_API_KEY'),
+    'TAVILY_API_KEY_3',
+  );
+  // A gap is filled before growing the suffix.
+  assert.equal(
+    nextRefName(['TAVILY_API_KEY', 'TAVILY_API_KEY_3'], 'TAVILY_API_KEY'),
+    'TAVILY_API_KEY_2',
+  );
+});
+
+test('client: the add button appends a reference name through form.mutate', async () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations, state } = fakeContext(DEFAULT_CONFIG);
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({
+    subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } },
+  });
+  const tree = element.type(element.props);
+
+  const addButtons = collectAddButtons(tree);
+  assert.equal(addButtons.length, 2, 'one add button per group');
+  assert.equal(addButtons[0].props.disabled, false);
+
+  await addButtons[0].props.onClick();
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'set', path: ['tavilyApiKeyRefs', 1], value: 'TAVILY_API_KEY_2' },
+  ]);
+
+  // The second add button targets the firecrawl array independently.
+  await addButtons[1].props.onClick();
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
+  ]);
+});
+
+test('client: a remove button unsets that reference', async () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations, state } = fakeContext({
+    tavilyApiKeyRefs: ['TAVILY_API_KEY', 'TAVILY_API_KEY_2'],
+    firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
+  });
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({
+    subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } },
+  });
+  const tree = element.type(element.props);
+
+  const removeButtons = collectButtons(tree);
+  assert.equal(removeButtons.length, 2, 'only the two-row group gets remove buttons');
+
+  await removeButtons[0].props.onClick();
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'unset', path: ['tavilyApiKeyRefs', 0] },
+  ]);
+});
+
+test('client: add is disabled when the form cannot mutate', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations } = fakeContext(DEFAULT_CONFIG, { mutate: false });
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({
+    subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } },
+  });
+  const tree = element.type(element.props);
+
+  const addButtons = collectAddButtons(tree);
+  assert.equal(addButtons.length, 2);
+  assert.ok(addButtons.every((button) => button.props.disabled === true));
+  // Default config has one ref per group, so no remove buttons either.
+  assert.equal(collectButtons(tree).length, 0);
 });

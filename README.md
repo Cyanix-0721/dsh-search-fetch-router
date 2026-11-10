@@ -72,10 +72,13 @@ export TAVILY_API_KEY=tvly-...
 
 The easiest way to fill these in is the **API keys** card this plugin adds to its own
 page under **插件 / Plugins** — one password field per reference name, saved straight to
-the DSH credentials store. Values still never touch a YAML file. If you would rather edit
-by hand, the block above works too. (The host's built-in credential UI only covers
-model-provider keys, so an arbitrary name like `TAVILY_API_KEY` has no button there;
-the file is already 0600 and the host refuses to start if that ever widens.)
+the DSH credentials store. Press **Add account** to append another reference name
+(`TAVILY_API_KEY_2`, …) and a new field; the pool rotates across them, and a per-row
+**Remove** drops one (you can never delete the last). Values still never touch a YAML
+file. If you would rather edit by hand, the block above works too. (The host's built-in
+credential UI only covers model-provider keys, so an arbitrary name like `TAVILY_API_KEY`
+has no button there; the file is already 0600 and the host refuses to start if that ever
+widens.)
 
 The credentials store wins over the environment. Reference names must be valid shell
 identifiers (`[A-Za-z_][A-Za-z0-9_]*`); a malformed name is treated as "not configured"
@@ -83,7 +86,8 @@ rather than as an error, so one typo cannot take the whole chain down.
 
 ### Multiple keys
 
-Set the reference list in settings, one name per line:
+Press **Add account** in the card, or set the reference list in settings, one name per
+line:
 
 ```
 TAVILY_API_KEY_1

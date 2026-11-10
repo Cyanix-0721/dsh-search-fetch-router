@@ -57,7 +57,7 @@ lib/firecrawl.js      /v2/scrape 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
 lib/execute.js        执行层：把决策落到调用上，失败降级
-lib/client.js         零构建浏览器设置卡：填 Tavily / Firecrawl 的 key（写 credentials）
+lib/client.js         零构建浏览器设置卡：填 Tavily / Firecrawl 的 key（写 credentials），可加/删多账号
 test/*.test.js        node --test，无框架依赖
 ```
 
