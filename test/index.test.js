@@ -94,7 +94,7 @@ test('apply: the search provider delegates into the router', async () => {
   );
 });
 
-test('apply: the registered effect disposes the search provider on teardown', () => {
+test('apply: the registered effect disposes both providers on teardown', () => {
   const web = fakeWeb();
   const ctx = fakePluginCtx({ web });
   apply(ctx, Config({}));
@@ -104,4 +104,5 @@ test('apply: the registered effect disposes the search provider on teardown', ()
   assert.equal(typeof dispose, 'function');
   dispose();
   assert.equal(web.state.searchProvider, undefined);
+  assert.equal(web.state.fetchProvider, undefined);
 });

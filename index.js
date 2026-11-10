@@ -49,8 +49,9 @@ export function apply(ctx, config = Config({})) {
 
   // 抓取提供方同理，但**包在 try 里**：`web.registerFetchProvider` 是可选能力。
   // 宿主少了它只该让 web_fetch 走官方提供方，不该连搜索一起拖下水。
+  let unregisterFetch;
   try {
-    ctx.web.registerFetchProvider({
+    unregisterFetch = ctx.web.registerFetchProvider({
       id: PROVIDER_ID,
       available: () => true,
       fetch: (request, signal) => router.fetch(request, signal),
@@ -62,7 +63,10 @@ export function apply(ctx, config = Config({})) {
     );
   }
 
-  // 宿主关闭时撤销注册。`registerProvider` 自己也会随 fiber 释放，这里显式一次
-  // 是为了让「插件卸载」这件事在两条路径上都成立。
-  ctx.effect(() => () => unregisterSearch(), 'dsh-search-fetch-router.unregister()');
+  // 宿主关闭时撤销注册。两个 provider 都显式注销：`registerProvider` 自己也会随
+  // fiber 释放，但把 fetch 的句柄留住、一并撤销，卸载路径才在两边都成立。
+  ctx.effect(() => () => {
+    unregisterSearch();
+    unregisterFetch?.();
+  }, 'dsh-search-fetch-router.unregister()');
 }
