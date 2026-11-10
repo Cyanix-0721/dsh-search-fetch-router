@@ -38,7 +38,7 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
-  `doesNotThrow`，搜索 provider 仍注册。teardown 时 effect 会注销搜索 provider。
+  `doesNotThrow`，搜索 provider 仍注册。teardown 时 effect 会注销两个 provider。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。
