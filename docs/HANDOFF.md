@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 86 全过。**还没在真实 DSH 里跑过**，
+插件已实现、已提交、已推到 GitHub，`npm test` 90 全过。**还没在真实 DSH 里跑过**，
 因为开发会话的 `~/.dsh/profiles/web/` 是只读的，装不进去。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
@@ -34,8 +34,11 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
 
 **已验证**
 
-- `npm test` → 86 pass / 0 fail（`node --test`，无框架依赖，约 140ms）。
+- `npm test` → 90 pass / 0 fail（`node --test`，无框架依赖，约 145ms）。
 - `node --check` 全部源文件通过。
+- `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
+  pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
+  `doesNotThrow`，搜索 provider 仍注册。teardown 时 effect 会注销搜索 provider。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。
