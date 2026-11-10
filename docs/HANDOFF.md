@@ -8,7 +8,7 @@
 因为开发会话的 `~/.dsh/profiles/web/` 是只读的，装不进去。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
-- 本地：`/home/slayer/repos/TEST/dsh-search-fetch-router`
+- 本地：`/home/slayer/repos/dsh-search-fetch-router`
 - 最新提交：`f95be22 feat: route web search and fetch through Tavily, escalating to Firecrawl`
 - 分支：`main`，已跟踪 `origin/main`
 
@@ -83,7 +83,7 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
 `node_modules/@deepseek-ai/*` 是指向 DSH 安装处的符号链接，只为本地解析，不进 git：
 
 ```bash
-cd /home/slayer/repos/TEST/dsh-search-fetch-router
+cd /home/slayer/repos/dsh-search-fetch-router
 npm test
 ```
 
@@ -99,7 +99,9 @@ done
 
 ## 环境坑（这台机器上）
 
-- `/home/slayer/repos/` 本身**只读**，仓库只能落在 `/home/slayer/repos/TEST/` 下。
+- `/home/repo/` 不存在且 `/home` 归 root，普通用户建不了；仓库放在 `/home/slayer/repos/` 下。
+  开发会话若用 workspace-write 策略，写入范围只到会话工作区，`mv` 出界会被沙箱拒绝——
+  换 danger-full-access 或直接在目标目录开会话。
 - WSL 侧 SSH 认证不可用（`Permission denied (publickey)`）。push 走 HTTPS + gh token：
   remote 已配成 `https://x-access-token:$(gh auth token)@github.com/...` 的形式。
 - `@deepseek-ai/*` 在 npm 上的 **`latest` 指向坏掉的 `0.0.1-rc.1`**（依赖已撤包的
