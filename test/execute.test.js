@@ -116,27 +116,6 @@ test('fetch: unusable Tavily content escalates to Firecrawl', async () => {
   }
 });
 
-test('fetch: a whitelisted URL skips Tavily entirely', async () => {
-  const stub = stubFetch((url) => {
-    if (url.includes('firecrawl.dev')) {
-      return Response.json({ data: { markdown: '# whitelisted', metadata: {} } });
-    }
-    throw new Error(`unexpected ${url}`);
-  });
-  try {
-    const ctx = fakeCtx({
-      credentials: fakeCredentials({ TAVILY_API_KEY: 'k', FIRECRAWL_API_KEY: 'f' }),
-    });
-    const router = createRouter(ctx, configWith({ firecrawlUrlPatterns: ['example.com/**'] }));
-    const result = await router.fetch({ url: 'https://example.com/a' }, undefined);
-    assert.equal(result.body.content, '# whitelisted');
-    assert.equal(stub.calls.length, 1);
-    assert.match(stub.calls[0].url, /firecrawl/);
-  } finally {
-    stub.restore();
-  }
-});
-
 test('fetch: a failing Tavily key does not stop the next key in the pool', async () => {
   let extractCalls = 0;
   const stub = stubFetch((url, init) => {
@@ -471,22 +450,4 @@ test('fetch: a Tavily error (not just unusable content) escalates to Firecrawl',
   }
 });
 
-test('fetch: a whitelisted URL with no Firecrawl key falls back to Tavily instead of idling', async () => {
-  const stub = stubFetch((url) => {
-    if (url.includes('/extract')) {
-      return Response.json({ results: [{ raw_content: '# tavily handled whitelist' }], failed_results: [] });
-    }
-    return Response.json({ data: { markdown: '# should not use firecrawl', metadata: {} } });
-  });
-  try {
-    // 白名单命中但只配了 Tavily key：链应降到 Tavily，而不是直接失败。
-    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
-    const router = createRouter(ctx, configWith({ firecrawlUrlPatterns: ['example.com/**'] }));
-    const result = await router.fetch({ url: 'https://example.com/a' }, undefined);
-    assert.match(result.body.content, /tavily handled whitelist/);
-    assert.equal(stub.calls.length, 1);
-    assert.match(stub.calls[0].url, /tavily/);
-  } finally {
-    stub.restore();
-  }
-});
+

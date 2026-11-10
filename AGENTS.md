@@ -7,7 +7,9 @@
 一个 DSH（DeepSeek Harness）插件，接管 `ctx.web` 的搜索与抓取两条能力，路由顺序：
 
 - **搜索**：Tavily（key 池）→ DSH 官方 `deepseek-official`（走 magpie 网关）
-- **抓取**：URL 白名单命中 → Firecrawl 直连；否则 Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`
+- **抓取**：固定顺序 Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`
+
+高级抓取（整站爬、反爬、结构化抽取）不归本插件管，交给 firecrawl MCP。
 
 provider id 是 `search-fetch-router`，搜索与抓取共用（seam 存两张表，同名不冲突）。
 
@@ -50,7 +52,7 @@ index.js              apply()：注册两个 provider，只做装配
 cordis.patch.yml      bundle patch：mount + pin provider + 提 tool-web 超时
 lib/config.js         schemastery schema，全字段 .volatile()，零密钥
 lib/router.js         纯决策：链顺序、升级判定、预算切片（无 I/O，最好测）
-lib/urls.js           URL 校验 + glob 匹配（* 不跨 /，** 跨）
+lib/urls.js           URL 校验（长度 / 协议 / 内嵌凭据）
 lib/keyring.js        refs 池：轮转 / 冷却 / 永久失效
 lib/tavily.js         /search 与 /extract 的 REST
 lib/firecrawl.js      /v2/scrape 的 REST 与响应映射

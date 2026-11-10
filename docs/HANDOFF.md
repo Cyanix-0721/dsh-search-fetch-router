@@ -20,11 +20,10 @@
 | 能力 | 链路 |
 | --- | --- |
 | 搜索 | Tavily key 池 → 宿主 `deepseek-official`（走 magpie 网关） |
-| 抓取（URL 命中白名单） | Firecrawl → Tavily → 本地 `http` |
-| 抓取（其他） | Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http` |
+| 抓取 | Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http` |
 
-Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错、Tavily 没拿到可用内容
-（正文为空、`failed_results` 非空、正文短于 `minContentChars`）。
+Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可用内容
+（正文为空、`failed_results` 非空、正文短于 `minContentChars`）。高级抓取交给 firecrawl MCP。
 
 **刻意不做**「内容看起来不完整就升级」——猜错就是白花额度。
 
@@ -46,7 +45,7 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
 - 官方回落读 `web-search-deepseek` 段：有 settings 时请求打到配置的 `baseURL`，没有时
   回落 `DEEPSEEK_DEFAULT_BASE_URL`（2026-11-10 补测，见 `test/execute.test.js`）。
 - 关键降级路径均有测试：`maxBodyChars` 截断置 `truncated`、Tavily 报错（非内容不可用）
-  升级 Firecrawl、白名单命中但无 Firecrawl key 时降到 Tavily、Tavily 全失败回落官方。
+  升级 Firecrawl、Tavily 全失败回落官方。
 - **已装进 `~/.dsh/profiles/web`**（2026-11-11）：
   `dsh plugin --profile web add /home/slayer/repos/dsh-search-fetch-router` 以 `link:` 依赖
   写入 `package.json`，并**自动加入 `dsh.profile.bundles`（末尾）**。
@@ -74,8 +73,8 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
    `TAVILY_API_KEY` 与 `FIRECRAWL_API_KEY`。宿主的凭据界面只管模型供应商的 key，
    自定义引用名没有按钮，只能手编文件。**注意：DSH 不脱敏工具输出，别在会话里
    `cat` 这个文件。**
-3. **跑通真实请求。** 一次 `web_search`、一次普通页 `web_fetch`、一次需要浏览器的页
-   （加到 `firecrawlUrlPatterns` 再抓），确认三条路径都走到。
+3. **跑通真实请求。** 一次 `web_search`、一次普通页 `web_fetch`，以及一次反爬/JS 重的页
+   （确认 Tavily 拿不到时能降到 Firecrawl），确认各条路径都走到。
 4. **补 CI。** ~~已完成。~~ `gh auth refresh -s workflow` 后 `.github/workflows/ci.yml`
    已提交并推送（`66627ea`）。注意：工作流能被 GitHub 接收，但因**账号级 billing
    lock**（`The job was not started because your account is locked due to a billing

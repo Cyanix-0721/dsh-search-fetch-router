@@ -12,22 +12,19 @@ environment) and the plugin only ever holds a reference name.
 
 **Search** — Tavily key pool → the host's `deepseek-official` provider.
 
-**Fetch** — depends on the URL:
+**Fetch** — one fixed chain: Tavily `/extract` → Firecrawl `/v2/scrape` → local `http`.
 
-| Situation | Chain |
-| --- | --- |
-| URL matches the whitelist | Firecrawl → Tavily → local `http` |
-| Anything else | Tavily `/extract` → Firecrawl `/v2/scrape` → local `http` |
+Firecrawl is used when Tavily cannot do the job, in two cases only:
 
-Firecrawl is used when Tavily cannot do the job, in three cases only:
-
-1. the URL is whitelisted — the user already said "this site needs a browser";
-2. Tavily errored (network, timeout, non-2xx);
-3. Tavily returned nothing usable — empty body, `failed_results` non-empty, or a body
+1. Tavily errored (network, timeout, non-2xx);
+2. Tavily returned nothing usable — empty body, `failed_results` non-empty, or a body
    shorter than `minContentChars`.
 
 There is deliberately no "content looks incomplete" heuristic. Guessing costs Firecrawl
 credits on pages that were already fine.
+
+Anything fancier — multi-page crawl, anti-bot, structured extraction — is not this
+plugin's job. Use the firecrawl MCP tools for that.
 
 Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each backend gets
 `min(its own timeout, whatever is left)`; when less than 2 s remains, no new backend starts.
@@ -121,7 +118,6 @@ live.
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key reference names, tried in order |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key reference names |
-| `firecrawlUrlPatterns` | `[]` | glob whitelist, matched against `host + path` |
 | `tavilyExtractDepth` | `basic` | `basic` or `advanced` |
 | `minContentChars` | `0` | escalate below this length; `0` means only emptiness counts |
 | `totalBudgetMs` | `45000` | hard cap for one fetch |
@@ -134,19 +130,6 @@ live.
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |
 | `firecrawlMaxAgeMs` | `172800000` | Firecrawl cache TTL, two days |
-
-### Whitelist syntax
-
-Glob, not regex — a typo produces "no match", not a syntax error, and there is no ReDoS
-surface. `*` matches a run of characters that contains no `/`; `**` matches anything.
-
-```
-docs.example.com/**        # that host, any path
-*.medium.com/*             # one path segment on any medium.com subdomain
-example.com                # bare host also matches every path under it
-```
-
-The match surface is `host + pathname` — scheme, port and query string are ignored.
 
 ## Errors
 

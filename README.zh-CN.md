@@ -11,21 +11,17 @@
 
 **搜索** —— Tavily key 池 → 宿主的 `deepseek-official`。
 
-**抓取** —— 看 URL：
+**抓取** —— 固定一条链：Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`。
 
-| 情况 | 链路 |
-| --- | --- |
-| URL 命中白名单 | Firecrawl → Tavily → 本地 `http` |
-| 其他 | Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http` |
+只有两种情况会动用 Firecrawl：
 
-只有三种情况会动用 Firecrawl：
-
-1. URL 在白名单里——用户已经说了「这站要浏览器」；
-2. Tavily 报错（网络、超时、非 2xx）；
-3. Tavily 没拿到可用的东西——正文为空、`failed_results` 非空，或正文短于
+1. Tavily 报错（网络、超时、非 2xx）；
+2. Tavily 没拿到可用的东西——正文为空、`failed_results` 非空，或正文短于
    `minContentChars`。
 
 **刻意不做**「内容看起来不完整」这种猜测。猜错就是白花 Firecrawl 的额度。
+
+再花哨的——整站爬、反爬、结构化抽取——不是本插件的活，走 firecrawl MCP。
 
 每次抓取跑在一个硬预算下（`totalBudgetMs`，默认 45 秒）。每段拿
 `min(自己的超时, 剩余预算)`；剩余不足 2 秒就不再开新段。
@@ -108,7 +104,6 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key 引用名，按序尝试 |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key 引用名 |
-| `firecrawlUrlPatterns` | `[]` | glob 白名单，匹配 `host + path` |
 | `tavilyExtractDepth` | `basic` | `basic` 或 `advanced` |
 | `minContentChars` | `0` | 短于此长度就升级；`0` 表示只判空 |
 | `totalBudgetMs` | `45000` | 单次抓取硬上限 |
@@ -121,19 +116,6 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |
 | `firecrawlMaxAgeMs` | `172800000` | Firecrawl 缓存有效期，两天 |
-
-### 白名单语法
-
-用 glob，不是正则——写错只会「不匹配」，不会报语法错误，也没有 ReDoS 面。
-`*` 匹配一段不含 `/` 的字符，`**` 匹配任意字符。
-
-```
-docs.example.com/**        # 该 host 的任意路径
-*.medium.com/*             # 任意 medium.com 子域下的一段路径
-example.com                # 裸 host 也匹配它下面的所有路径
-```
-
-匹配面是 `host + pathname`——协议、端口、查询串都不参与。
 
 ## 错误
 

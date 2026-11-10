@@ -28,60 +28,28 @@ test('search chain: nothing usable yields an empty chain', () => {
   assert.deepEqual(planSearchChain({ hasTavily: false, hasOfficial: false, fallback: true }), []);
 });
 
-test('fetch chain: Tavily first, Firecrawl escalates, http last', () => {
+test('fetch chain: fixed order Tavily, Firecrawl, http', () => {
   assert.deepEqual(
-    planFetchChain({
-      url: 'https://example.com/a',
-      patterns: [],
-      hasFirecrawl: true,
-      hasTavily: true,
-      hasHttp: true,
-      fallback: true,
-      matches: () => false,
-    }),
+    planFetchChain({ hasFirecrawl: true, hasTavily: true, hasHttp: true, fallback: true }),
     ['tavily', 'firecrawl', 'http'],
   );
 });
 
-test('fetch chain: a whitelisted URL goes straight to Firecrawl', () => {
-  assert.deepEqual(
-    planFetchChain({
-      url: 'https://docs.example.com/guide',
-      patterns: ['docs.example.com/**'],
-      hasFirecrawl: true,
-      hasTavily: true,
-      hasHttp: true,
-      fallback: true,
-      matches: () => true,
-    }),
-    ['firecrawl', 'tavily', 'http'],
-  );
+test('fetch chain: no backend is listed twice', () => {
+  const chain = planFetchChain({ hasFirecrawl: true, hasTavily: true, hasHttp: true, fallback: true });
+  assert.equal(new Set(chain).size, chain.length);
 });
 
-test('fetch chain: no backend is listed twice', () => {
-  const chain = planFetchChain({
-    url: 'https://example.com',
-    patterns: [],
-    hasFirecrawl: true,
-    hasTavily: true,
-    hasHttp: true,
-    fallback: true,
-    matches: () => false,
-  });
-  assert.equal(new Set(chain).size, chain.length);
+test('fetch chain: no Firecrawl key drops it from the chain', () => {
+  assert.deepEqual(
+    planFetchChain({ hasFirecrawl: false, hasTavily: true, hasHttp: true, fallback: true }),
+    ['tavily', 'http'],
+  );
 });
 
 test('fetch chain: fallback disabled removes the local http provider', () => {
   assert.deepEqual(
-    planFetchChain({
-      url: 'https://example.com',
-      patterns: [],
-      hasFirecrawl: false,
-      hasTavily: true,
-      hasHttp: true,
-      fallback: false,
-      matches: () => false,
-    }),
+    planFetchChain({ hasFirecrawl: false, hasTavily: true, hasHttp: true, fallback: false }),
     ['tavily'],
   );
 });
