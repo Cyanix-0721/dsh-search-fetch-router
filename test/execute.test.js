@@ -1,21 +1,39 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { DEEPSEEK_DEFAULT_BASE_URL } from '@deepseek-ai/dsh-web-search-deepseek';
+
 import { Config } from '../lib/config.js';
 import { createRouter } from '../lib/execute.js';
 
 /**
- * 造一个最小 ctx。只提供插件真正读的三样：`credentials`、`launchEnvironment`、`logger`。
- * @param options - `{credentials}`。
+ * 造一个最小 ctx。只提供插件真正读的四样：`credentials`、`settings`、
+ * `launchEnvironment`（未提供时 `launchEnvironmentOf` 会安全跳过）、`logger`。
+ * @param options - `{credentials, settings}`。
  * @returns 假 ctx。
  */
-function fakeCtx({ credentials } = {}) {
+function fakeCtx({ credentials, settings } = {}) {
   return {
     get(name) {
       if (name === 'credentials') return credentials;
+      if (name === 'settings') return settings;
       return undefined;
     },
     logger: { warn() {} },
+  };
+}
+
+/**
+ * 造一个只实现 `describe()` 的假 settings 服务，回放 `web-search-deepseek` 段。
+ * 传 `undefined` 时返回空条目列表，等价于「用户没配这一段」。
+ * @param value - 该段的值。
+ * @returns 假 settings 服务。
+ */
+function fakeSettings(value) {
+  return {
+    describe() {
+      return value === undefined ? [] : [{ ns: 'web-search-deepseek', value }];
+    },
   };
 }
 
@@ -328,6 +346,54 @@ test('search: a key that just failed stays out of the next call (cooldown surviv
     await router.search({ query: 'q2' }, undefined);
     // bad 还在冷却里，这一轮不该再被撞一次
     assert.deepEqual(seen, ['Bearer good']);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: official fallback reads baseURL from the web-search-deepseek settings section', async () => {
+  const seen = [];
+  const stub = stubFetch((url) => {
+    seen.push(String(url));
+    return Response.json({
+      content: [{
+        type: 'web_search_tool_result',
+        content: [{ type: 'web_search_result', url: 'https://a.example.com', title: 'A' }],
+      }],
+    });
+  });
+  try {
+    // 没有 Tavily key ⇒ 链里只剩 official；searchFallback 打开它。
+    const ctx = fakeCtx({
+      credentials: fakeCredentials({ DEEPSEEK_API_KEY: 'sk-test' }),
+      settings: fakeSettings({ baseURL: 'https://magpie.example/anthropic/v1' }),
+    });
+    const router = createRouter(ctx, Config({ fetchFallback: false, searchFallback: true }));
+    const result = await router.search({ query: 'q' }, undefined);
+    // 请求必须打到用户配的 magpie 网关，而不是官方默认端点。
+    assert.deepEqual(seen, ['https://magpie.example/anthropic/v1/messages']);
+    assert.equal(result.sources[0].url, 'https://a.example.com');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: official fallback without a settings section uses the DeepSeek default baseURL', async () => {
+  const seen = [];
+  const stub = stubFetch((url) => {
+    seen.push(String(url));
+    return Response.json({
+      content: [{
+        type: 'web_search_tool_result',
+        content: [{ type: 'web_search_result', url: 'https://a.example.com' }],
+      }],
+    });
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ DEEPSEEK_API_KEY: 'sk-test' }) });
+    const router = createRouter(ctx, Config({ fetchFallback: false, searchFallback: true }));
+    await router.search({ query: 'q' }, undefined);
+    assert.deepEqual(seen, [`${DEEPSEEK_DEFAULT_BASE_URL}/messages`]);
   } finally {
     stub.restore();
   }
