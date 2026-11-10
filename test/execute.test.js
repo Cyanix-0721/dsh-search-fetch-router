@@ -398,3 +398,95 @@ test('search: official fallback without a settings section uses the DeepSeek def
     stub.restore();
   }
 });
+
+test('fetch: maxBodyChars truncates a long Tavily body and marks it truncated', async () => {
+  const stub = stubFetch((url) => {
+    if (url.includes('/extract')) {
+      return Response.json({ results: [{ raw_content: 'x'.repeat(500) }], failed_results: [] });
+    }
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({ maxBodyChars: 40 }));
+    const result = await router.fetch({ url: 'https://example.com/a' }, undefined);
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.truncated, true);
+    assert.equal(result.body.content.length, 40);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: every Tavily key failing falls back to the official provider when fallback is on', async () => {
+  const seen = [];
+  const stub = stubFetch((url) => {
+    seen.push(String(url));
+    if (url.includes('tavily.com')) return new Response('down', { status: 500 });
+    if (url.endsWith('/messages')) {
+      return Response.json({
+        content: [{
+          type: 'web_search_tool_result',
+          content: [{ type: 'web_search_result', url: 'https://official.example.com', title: 'O' }],
+        }],
+      });
+    }
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({
+      credentials: fakeCredentials({ TAVILY_API_KEY: 'bad', DEEPSEEK_API_KEY: 'sk-test' }),
+    });
+    const router = createRouter(ctx, Config({ fetchFallback: false, searchFallback: true }));
+    const result = await router.search({ query: 'q' }, undefined);
+    assert.equal(result.sources[0].url, 'https://official.example.com');
+    // 先打 Tavily（失败），再打官方；共两次调用。
+    assert.equal(seen.length, 2);
+    assert.match(seen[0], /tavily/);
+    assert.match(seen[1], /\/messages$/);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('fetch: a Tavily error (not just unusable content) escalates to Firecrawl', async () => {
+  const stub = stubFetch((url) => {
+    if (url.includes('tavily.com/extract')) return new Response('boom', { status: 500 });
+    if (url.includes('firecrawl.dev')) {
+      return Response.json({ data: { markdown: '# from firecrawl error path', metadata: { statusCode: 200 } } });
+    }
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({
+      credentials: fakeCredentials({ TAVILY_API_KEY: 'bad', FIRECRAWL_API_KEY: 'f' }),
+    });
+    const router = createRouter(ctx, configWith({}));
+    const result = await router.fetch({ url: 'https://example.com/a' }, undefined);
+    assert.equal(result.body.content, '# from firecrawl error path');
+    assert.equal(stub.calls.length, 2);
+    assert.match(stub.calls[1].url, /firecrawl/);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('fetch: a whitelisted URL with no Firecrawl key falls back to Tavily instead of idling', async () => {
+  const stub = stubFetch((url) => {
+    if (url.includes('/extract')) {
+      return Response.json({ results: [{ raw_content: '# tavily handled whitelist' }], failed_results: [] });
+    }
+    return Response.json({ data: { markdown: '# should not use firecrawl', metadata: {} } });
+  });
+  try {
+    // 白名单命中但只配了 Tavily key：链应降到 Tavily，而不是直接失败。
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({ firecrawlUrlPatterns: ['example.com/**'] }));
+    const result = await router.fetch({ url: 'https://example.com/a' }, undefined);
+    assert.match(result.body.content, /tavily handled whitelist/);
+    assert.equal(stub.calls.length, 1);
+    assert.match(stub.calls[0].url, /tavily/);
+  } finally {
+    stub.restore();
+  }
+});

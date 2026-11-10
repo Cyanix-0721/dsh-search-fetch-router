@@ -4,12 +4,12 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 80 全过。**还没在真实 DSH 里跑过**，
+插件已实现、已提交、已推到 GitHub，`npm test` 86 全过。**还没在真实 DSH 里跑过**，
 因为开发会话的 `~/.dsh/profiles/web/` 是只读的，装不进去。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
 - 本地：`/home/slayer/repos/dsh-search-fetch-router`
-- 最新提交：`f95be22 feat: route web search and fetch through Tavily, escalating to Firecrawl`
+- 最新提交：以 `main` 为准（`git log --oneline -1`）；本次交接基线为 `3a4d6f9`
 - 分支：`main`，已跟踪 `origin/main`
 
 ## 它做什么
@@ -34,17 +34,22 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
 
 **已验证**
 
-- `npm test` → 80 pass / 0 fail（`node --test`，无框架依赖，约 130ms）。
+- `npm test` → 86 pass / 0 fail（`node --test`，无框架依赖，约 140ms）。
 - `node --check` 全部源文件通过。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。
+- 官方回落读 `web-search-deepseek` 段：有 settings 时请求打到配置的 `baseURL`，没有时
+  回落 `DEEPSEEK_DEFAULT_BASE_URL`（2026-11-10 补测，见 `test/execute.test.js`）。
+- 关键降级路径均有测试：`maxBodyChars` 截断置 `truncated`、Tavily 报错（非内容不可用）
+  升级 Firecrawl、白名单命中但无 Firecrawl key 时降到 Tavily、Tavily 全失败回落官方。
 
 **未验证**（这是下一阶段的主要工作）
 
 - 没在真实 DSH 里装过、没跑过 `--dump-config`、没发过真实 Tavily / Firecrawl 请求。
-- 官方回落路径在测试里走的是默认值分支（`test/execute.test.js` 的 `fakeCtx` 没有
-  `settings`），所以「读到用户配的 magpie 网关」这件事只有源码层面的确认。
+- 本地 HTTP 回落（`HttpFetchProvider`）**成功路径没有单测**：它内部用
+  `await import('undici')` 直连网络，绕过了测试里的 `globalThis.fetch` stub，要覆盖就得
+  mock `undici` 模块，暂未做。失败/降级路径靠其余后端测试间接覆盖。
 
 ## 下一阶段要做的
 
@@ -57,10 +62,10 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
    `cat` 这个文件。**
 3. **跑通真实请求。** 一次 `web_search`、一次普通页 `web_fetch`、一次需要浏览器的页
    （加到 `firecrawlUrlPatterns` 再抓），确认三条路径都走到。
-4. **补 CI。** `.github/workflows/ci.yml` 已写好但在工作区未提交——`gh` 的 OAuth token
-   缺 `workflow` scope，推不上去（`refusing to allow an OAuth App to create or update
-   workflow ... without workflow scope`）。要么用户执行 `gh auth refresh -s workflow`
-   后重推，要么用户在网页上手动加这个文件。**别用别的 token 绕过。**
+4. **补 CI。** ~~已完成。~~ `gh auth refresh -s workflow` 后 `.github/workflows/ci.yml`
+   已提交并推送（`66627ea`）。注意：工作流能被 GitHub 接收，但因**账号级 billing
+   lock**（`The job was not started because your account is locked due to a billing
+   issue.`）runner 起不来，与仓库公开与否、与 workflow 配置都无关，需用户处理账号账单。
 5. **发布到 npm。** 包名 `dsh-search-fetch-router` 目前 404，可用。发了之后
    README 的安装段可以从 `github:` 改成包名。
 
@@ -99,14 +104,16 @@ done
 
 ## 环境坑（这台机器上）
 
-- `/home/repo/` 不存在且 `/home` 归 root，普通用户建不了；仓库放在 `/home/slayer/repos/` 下。
-  开发会话若用 workspace-write 策略，写入范围只到会话工作区，`mv` 出界会被沙箱拒绝——
-  换 danger-full-access 或直接在目标目录开会话。
-- WSL 侧 SSH 认证不可用（`Permission denied (publickey)`）。push 走 HTTPS + gh token：
-  remote 已配成 `https://x-access-token:$(gh auth token)@github.com/...` 的形式。
+- 仓库当前 checkout 在 `/home/slayer/repos/dsh-search-fetch-router`。workspace-write 策略
+  下写入范围只到会话工作区，`~/.dsh/...` 这类工作区外路径改不了（装插件要另想办法）。
+- WSL 侧 SSH 认证不可用（`Permission denied (publickey)`）。push 走 HTTPS + gh 凭证：
+  remote 现在是干净的 `https://github.com/Cyanix-0721/dsh-search-fetch-router.git`，由
+  `gh auth setup-git` 注入 token，**不再把 token 明文写进 URL**（旧写法已弃用）。
 - `@deepseek-ai/*` 在 npm 上的 **`latest` 指向坏掉的 `0.0.1-rc.1`**（依赖已撤包的
   `@deepseek-ai/dsh-environment`，E404）。**必须用 `next` tag。**
 - `npm pack` / `npx` 在开发会话里因 `EROFS` 失败（`~/.npm/_cacache` 只读）。
+- `~/.dsh/.credentials.yaml` 受安全策略 `secret.deny-path` 保护，agent 直接读会被
+  「BLOCKED by CC Safety Net」。key 的填写与确认只能由用户自己完成。
 - DSH **不做工具输出脱敏**：`grep` 回显、`cat` 内容都会明文进会话日志
   （`~/.dsh/sessions/<workspace>/session-<id>/session.v3.jsonl.zstd`）。查密钥类内容只用
   `grep -c` / `grep -l`，不要回显匹配行。
