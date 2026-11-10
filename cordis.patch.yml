@@ -1,0 +1,43 @@
+# dsh-search-fetch-router bundle patch: mount the plugin and pin both web providers.
+#
+# ⚠️ `config` on an id-targeted patch REPLACES the whole config object.
+# `cordis-plugin-include`'s `applyEntryPatches` does `target[key] = value` for
+# every key of a patch, so assigning `config` discards the previous object
+# entirely. Consequences, all silent rather than loud:
+#
+#   - on `web`, omitting one of the two provider fields drops it from the
+#     composed row, reverting that capability to auto-selection;
+#   - on `tool-web`, omitting `fetch` turns `web_fetch` off, and omitting a
+#     timeout falls back to the 30 s default — which is shorter than this
+#     plugin's own 45 s chain budget, so a slow Tavily → Firecrawl escalation
+#     would be aborted by the tool layer before the router gives up.
+#
+# Therefore both provider fields are written together, and `tool-web` repeats
+# every field it needs. Verified against the host's own `applyEntryPatches`.
+#
+# Pinning an id that is not registered makes every call throw
+# `WEB_PROVIDER_CONFIGURED_MISSING`, so a half-loaded plugin is a broken one.
+# That is why `apply()` registers both providers before anything that can fail.
+#
+# Manual rollback: point both fields back at the official providers and keep
+# BOTH lines present:
+#   searchProvider: deepseek-official
+#   fetchProvider: http
+#
+# No key material belongs in this file, or in any patch layer. Keys are read
+# through the DSH credentials service by reference name; see README.
+
+- insert:
+    - id: search-fetch-router
+      name: dsh-search-fetch-router
+
+- id: web
+  config:
+    searchProvider: search-fetch-router
+    fetchProvider: search-fetch-router
+
+- id: tool-web
+  config:
+    fetch: true
+    fetchTimeoutMs: 60000
+    searchTimeoutMs: 60000

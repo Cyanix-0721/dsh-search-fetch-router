@@ -1,0 +1,60 @@
+{
+  "name": "dsh-search-fetch-router",
+  "version": "0.1.0",
+  "description": "Tavily-first web search and fetch router for DeepSeek Harness: Tavily key pool, Firecrawl escalation, official fallback, credentials-only keys.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "default": "./index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cyanix-0721/dsh-search-fetch-router.git"
+  },
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "tavily",
+    "firecrawl",
+    "web-search",
+    "web-fetch"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1",
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5",
+    "@deepseek-ai/dsh-credentials": ">=0.2.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": ">=0.2.2-rc.1",
+    "@deepseek-ai/dsh-settings": ">=0.2.2-rc.1",
+    "@deepseek-ai/dsh-web": ">=0.2.2-rc.1",
+    "@deepseek-ai/dsh-web-fetch-http": ">=0.2.2-rc.1",
+    "@deepseek-ai/dsh-web-search-deepseek": ">=0.2.2-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.2"
+  }
+}
