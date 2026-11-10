@@ -4,8 +4,9 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 90 全过。**还没在真实 DSH 里跑过**，
-因为开发会话的 `~/.dsh/profiles/web/` 是只读的，装不进去。
+插件已实现、已提交、已推到 GitHub，`npm test` 90 全过。已**装进本机 web profile** 并通过
+`dsh --dump-config` 静态验证（provider 已 pin 到 `search-fetch-router`），**待重启 DSH 后生效**。
+运行时真实搜索/抓取尚未验证；Tavily/Firecrawl key 是否已配未在会话内确认。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
 - 本地：`/home/slayer/repos/dsh-search-fetch-router`
@@ -46,19 +47,29 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
   回落 `DEEPSEEK_DEFAULT_BASE_URL`（2026-11-10 补测，见 `test/execute.test.js`）。
 - 关键降级路径均有测试：`maxBodyChars` 截断置 `truncated`、Tavily 报错（非内容不可用）
   升级 Firecrawl、白名单命中但无 Firecrawl key 时降到 Tavily、Tavily 全失败回落官方。
+- **已装进 `~/.dsh/profiles/web`**（2026-11-11）：
+  `dsh plugin --profile web add /home/slayer/repos/dsh-search-fetch-router` 以 `link:` 依赖
+  写入 `package.json`，并**自动加入 `dsh.profile.bundles`（末尾）**。
+  `dsh --profile web --dump-config` 通过：`web.searchProvider` 与 `web.fetchProvider` 均为
+  `search-fetch-router`，`tool-web.fetchTimeoutMs` 为 60000，插件 `insert` 生效；从 profile
+  目录 `import('dsh-search-fetch-router')` 也能解析（peer 由仓库 `node_modules` 的符号链接满足）。
+- **生产影响（已获用户同意）**：web profile 原先由 `@tnnevol/dsh-failover-search` 接管
+  `web_search`/`web_fetch`，装本插件后这两个 provider 已改由本插件接管。
 
 **未验证**（这是下一阶段的主要工作）
 
-- 没在真实 DSH 里装过、没跑过 `--dump-config`、没发过真实 Tavily / Firecrawl 请求。
+- **运行时真实搜索/抓取尚未验证**：需重启 DSH 后跑一次 `web_search`、一次 `web_fetch`。
+- 未在会话内确认 `~/.dsh/.credentials.yaml` 是否已有 `TAVILY_API_KEY` / `FIRECRAWL_API_KEY`
+  （该文件被 `secret.deny-path` 拦截，agent 读不到）。缺 key 时搜索回落官方、抓取回落本地 http。
 - 本地 HTTP 回落（`HttpFetchProvider`）**成功路径没有单测**：它内部用
   `await import('undici')` 直连网络，绕过了测试里的 `globalThis.fetch` stub，要覆盖就得
   mock `undici` 模块，暂未做。失败/降级路径靠其余后端测试间接覆盖。
 
 ## 下一阶段要做的
 
-1. **装进 DSH 试跑。** 命令在 `README.zh-CN.md` 的「安装」段。装完重启，看
-   `~/.dsh/profiles/web/cordis.patch.yml` 里有没有本插件写进去的 `insert`，以及
-   `web.searchProvider` / `web.fetchProvider` 是否都是 `search-fetch-router`。
+1. **重启 DSH 让插件真正加载。** 装与 `--dump-config` 静态验证已完成（见上）。重启后确认
+   运行时 `web.searchProvider` / `web.fetchProvider` 仍是 `search-fetch-router`，且
+   `web_search` / `web_fetch` 不报 `WEB_PROVIDER_CONFIGURED_MISSING` / `_UNAVAILABLE`。
 2. **填两个 key。** `~/.dsh/.credentials.yaml`（0600）的 `refs:` 段加
    `TAVILY_API_KEY` 与 `FIRECRAWL_API_KEY`。宿主的凭据界面只管模型供应商的 key，
    自定义引用名没有按钮，只能手编文件。**注意：DSH 不脱敏工具输出，别在会话里
@@ -71,6 +82,27 @@ Firecrawl 只在三种情况下被调用：URL 白名单命中、Tavily 报错�
    issue.`）runner 起不来，与仓库公开与否、与 workflow 配置都无关，需用户处理账号账单。
 5. **发布到 npm。** 包名 `dsh-search-fetch-router` 目前 404，可用。发了之后
    README 的安装段可以从 `github:` 改成包名。
+
+## 装 / 卸载到 profile
+
+```bash
+# 装（本地检出，link 依赖；会自动写入 dsh.profile.bundles 末尾）
+dsh plugin --profile web add /home/slayer/repos/dsh-search-fetch-router
+
+# 卸载（pnpm remove 后，手动从 ~/.dsh/profiles/web/package.json 的
+# dsh.profile.bundles 删掉 "dsh-search-fetch-router" 这一行）
+dsh plugin --profile web remove dsh-search-fetch-router
+```
+
+**回滚（本机 2026-11-11 装之前的备份，重启前随时可做）：**
+
+```bash
+cd ~/.dsh/profiles/web
+cp package.json.bak-20261111-000329 package.json
+cp pnpm-lock.yaml.bak-20261111-000329 pnpm-lock.yaml
+cp cordis.patch.yml.bak-20261111-000329 cordis.patch.yml
+pnpm install
+```
 
 ## 硬约束（改代码前必读）
 
@@ -107,16 +139,17 @@ done
 
 ## 环境坑（这台机器上）
 
-- 仓库当前 checkout 在 `/home/slayer/repos/dsh-search-fetch-router`。workspace-write 策略
-  下写入范围只到会话工作区，`~/.dsh/...` 这类工作区外路径改不了（装插件要另想办法）。
+- 仓库当前 checkout 在 `/home/slayer/repos/dsh-search-fetch-router`。`~/.dsh/...` 在会话工作区
+  之外，默认 workspace-write 策略改不了；装插件需 danger-full-access（本机 2026-11-11 已用
+  danger-full-access 完成安装）。
 - WSL 侧 SSH 认证不可用（`Permission denied (publickey)`）。push 走 HTTPS + gh 凭证：
   remote 现在是干净的 `https://github.com/Cyanix-0721/dsh-search-fetch-router.git`，由
   `gh auth setup-git` 注入 token，**不再把 token 明文写进 URL**（旧写法已弃用）。
 - `@deepseek-ai/*` 在 npm 上的 **`latest` 指向坏掉的 `0.0.1-rc.1`**（依赖已撤包的
   `@deepseek-ai/dsh-environment`，E404）。**必须用 `next` tag。**
 - `npm pack` / `npx` 在开发会话里因 `EROFS` 失败（`~/.npm/_cacache` 只读）。
-- `~/.dsh/.credentials.yaml` 受安全策略 `secret.deny-path` 保护，agent 直接读会被
-  「BLOCKED by CC Safety Net」。key 的填写与确认只能由用户自己完成。
+- `~/.dsh/.credentials.yaml` 受安全策略 `secret.deny-path` 保护，**即使 danger-full-access**
+  也拦（CC Safety Net 是插件层 hook，不走文件沙箱）。key 的填写与确认只能由用户自己完成。
 - DSH **不做工具输出脱敏**：`grep` 回显、`cat` 内容都会明文进会话日志
   （`~/.dsh/sessions/<workspace>/session-<id>/session.v3.jsonl.zstd`）。查密钥类内容只用
   `grep -c` / `grep -l`，不要回显匹配行。
