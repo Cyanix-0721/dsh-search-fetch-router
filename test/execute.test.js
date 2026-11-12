@@ -501,4 +501,31 @@ test('search: a newly registered backend is picked up via searchProviderOrder wi
   assert.deepEqual(calls, [{ apiKey: 'fk', query: 'q' }]);
 });
 
+test('search: an unknown id in searchProviderOrder is skipped, not fatal', async () => {
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ apiKey, request }) {
+      calls.push({ apiKey, query: request.query });
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    searchProviderOrder: ['ghost', 'fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/ok');
+  assert.deepEqual(calls, [{ apiKey: 'fk', query: 'q' }], 'ghost is skipped, only fake runs');
+});
+
 
