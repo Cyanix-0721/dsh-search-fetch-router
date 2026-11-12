@@ -47,11 +47,12 @@ index.js            apply(): register providers, nothing else
   └── lib/execute.js    execution: try each backend, degrade on failure
         ├── lib/router.js     pure decisions (chain order, escalation, budget slicing)
         ├── lib/search-backends.js  declarative search backend registry (add a provider here)
+        ├── lib/fetch-backends.js   declarative fetch backend registry (single-URL only)
         ├── lib/keyring.js    refs pool: rotate, cooldown, permanent death
         ├── lib/tavily.js     POST /search, POST /extract
         ├── lib/firecrawl.js  POST /v2/scrape
         ├── lib/official.js   host's DeepSeekSearchProvider + HttpFetchProvider
-        ├── lib/urls.js       URL validation, glob whitelist
+        ├── lib/urls.js       URL validation
         ├── lib/errors.js     stable codes, WebError wrapping
         └── lib/config.js     schemastery schema, all volatile, zero secrets
 ```
@@ -95,17 +96,24 @@ fake backend into `createRouter(..., { searchBackends })` and listing its id in
 
 ### Fetch
 
+The fetch chain is a plain, fixed order — this plugin is a router, not a crawler:
+
 ```
-URL matches whitelist?
-  yes ──> Firecrawl ──> Tavily ──> local http
-  no  ──> Tavily ──> Firecrawl ──> local http
+Tavily /extract ──> Firecrawl scrape ──> local HTTP
 ```
 
-Escalation from Tavily to Firecrawl happens on exactly three signals:
+Fetch backends are declarative too (`lib/fetch-backends.js`); each entry is
+`{id, label, keyRefsField|null, timeoutField, defaultTimeoutMs, keepLastErrorOnUnusable?, run()}`.
+`lib/execute.js` loops the chain from `planFetchChain` and dispatches through the registry: a
+keyed backend rotates its key pool, a keyless one (`http`) is called once. `run` returns
+`{kind:'result', result}` or `{kind:'unusable', reason}` (the backend produced nothing usable —
+move to the next backend **without** penalising the key); a thrown error penalises the key.
 
-1. the URL matched the whitelist (handled by chain order, not by escalation);
-2. the Tavily request threw (network, timeout, non-2xx);
-3. Tavily returned nothing usable:
+Escalation from Tavily to Firecrawl happens on exactly two signals (there is no URL whitelist
+any more):
+
+1. the Tavily request threw (network, timeout, non-2xx);
+2. Tavily returned nothing usable:
    - `results` empty or `raw_content` empty,
    - `failed_results[]` non-empty,
    - content shorter than `minContentChars` (when that is > 0).
@@ -113,6 +121,18 @@ Escalation from Tavily to Firecrawl happens on exactly three signals:
 Note that Tavily's `/extract` returns **HTTP 200 with an empty `results` array** when every
 URL fails. Treating 200 as success would silently produce empty pages, so the response
 mapper distinguishes success from failure explicitly.
+
+**Boundary:** whole-site crawling, anti-bot handling, structured extraction and batch jobs are
+**not** here — they belong to the firecrawl MCP. This plugin only routes a single-URL
+`web_fetch`.
+
+#### Adding a fetch provider
+
+1. Register it in `lib/fetch-backends.js` — `run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`
+   returning `{kind:'result', result}` or `{kind:'unusable', reason}`.
+2. Add its config fields in `lib/config.js` (a `…ApiKeyRefs` array + a `…TimeoutMs`), all `.volatile()`.
+3. Extend `planFetchChain` in `lib/router.js` with its id (fetch order is fixed, not a user
+   setting — keep it predictable).
 
 ### Budget
 
@@ -216,22 +236,25 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 94 tests.
+`node --test`, no framework, no build step. 100 tests.
 
-- `test/router.test.js` — data-driven chain order (`searchProviderOrder`, including dedupe and
-  the official fallback), whitelist inversion, escalation signals, budget slicing. Pure
-  functions, no stubs.
+- `test/router.test.js` — data-driven search chain order (`searchProviderOrder`, including
+  dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.
+  Pure functions, no stubs.
 - `test/urls.test.js` — glob semantics (`*` vs `**`), match surface, URL validation.
 - `test/keyring.test.js` — rotation, cooldown expiry, permanent death, unresolvable refs.
 - `test/firecrawl.test.js` — request body, response mapping, `metadata.statusCode` fallback.
 - `test/tavily.test.js` — request shape, source mapping, the HTTP-200-is-not-success case.
-- `test/execute.test.js` — degradation: Tavily down → Firecrawl; whitelist skips Tavily;
-  bad key rolls to the next; all down names every backend; no-key-configured is
-  actionable; invalid URL never reaches the network; aborted signal never reaches the
-  network; budget exhaustion is distinguished from failure.
+- `test/fetch-backends.test.js` — registry shape: its keys match `router.FETCH_BACKENDS`, the
+  keyed vs keyless field split, and `lookupFetchBackend` for known/unknown ids.
+- `test/execute.test.js` — degradation: Tavily down → Firecrawl; bad key rolls to the next;
+  all down names every backend; no-key-configured is actionable; invalid URL never reaches
+  the network; aborted signal never reaches the network; budget exhaustion is distinguished
+  from failure.
 - `test/execute.test.js` also proves the search registry extension point: a fake backend passed
   via `createRouter(..., { searchBackends })` and named in `searchProviderOrder` enters the
-  chain and is called, with no code branch to add.
+  chain and is called, with no code branch to add. The fetch chain dispatches through its own
+  registry the same way, with every pre-registry degradation path preserved exactly.
 
 CI runs on Node 22 and 24, installing host packages from the `next` dist-tag (the `latest`
 tag still points at the broken 0.0.1-rc.1 line, which depends on the unpublished

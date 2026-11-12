@@ -53,6 +53,7 @@ cordis.patch.yml      bundle patch：mount + pin provider + 提 tool-web 超时
 lib/config.js         schemastery schema，全字段 .volatile()，零密钥
 lib/router.js         纯决策：链顺序、升级判定、预算切片（无 I/O，最好测）
 lib/search-backends.js 声明式搜索后端注册表：加供应商只改这里 + config 字段，执行层不变
+lib/fetch-backends.js 声明式抓取后端注册表：只做单 URL 基础抓取，执行层同样不改
 lib/urls.js           URL 校验（长度 / 协议 / 内嵌凭据）
 lib/keyring.js        refs 池：轮转 / 冷却 / 永久失效
 lib/tavily.js         /search 与 /extract 的 REST
@@ -82,6 +83,10 @@ node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-
 - **新增搜索供应商走注册表，不加 if 分支。** 在 `lib/search-backends.js` 的 `SEARCH_BACKENDS`
   加一项 + `lib/config.js` 加字段 + 用户把 id 填进 `searchProviderOrder`；
   `lib/execute.js` 与 `lib/router.js` 保持数据驱动，不写 `if (backend === ...)`。
+- **新增抓取供应商同理走 `lib/fetch-backends.js`。** 抓取链是固定顺序（Tavily→Firecrawl→http），
+  但适配器在注册表里；`run` 返回 `{kind:'result'}` 或 `{kind:'unusable',reason}`。**整站爬 /
+  反爬 / 结构化抽取 / 批量任务仍归 firecrawl MCP，绝不塞进本插件**——本插件只是 `web_fetch`
+  的一条单 URL 路由。
 - **测试跟着降级路径写。** 这个插件的价值在「某一段挂了还能给出东西」，不在 happy path。
   新增后端时至少覆盖：成功、报错、内容为空、预算不足。
 - **错误码稳定。** `lib/errors.js` 的 `CODES` 是外部契约，工具层会把 code 放进结构化

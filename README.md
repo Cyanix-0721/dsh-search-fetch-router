@@ -49,8 +49,26 @@ skipping; a keyless one is called once behind `isAvailable`. `lib/execute.js` an
 `test/execute.test.js`, which proves it by injecting a registry.
 
 The **API keys** card in the browser bundle currently lists only Tavily / Firecrawl; a new
-keyed provider needs its own input group added in `lib/client.js` (the `run` and config
+keyed provider needs one line in `KEY_GROUPS` in `lib/client.js` (the `run` and config
 fields can land first — the card can follow).
+
+## Adding a fetch provider
+
+Fetch backends are **declaratively registered** too (`lib/fetch-backends.js`), but the fetch
+chain is a **fixed order** (Tavily → Firecrawl → local http) rather than a user setting, kept
+predictable. To add one:
+
+1. Add an entry to `FETCH_BACKENDS`: `id`, `label`, `keyRefsField`, `timeoutField`,
+   `defaultTimeoutMs`, and `run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`.
+   `run` returns `{kind:'result', result}` (success) or `{kind:'unusable', reason}` (nothing
+   usable — move on to the next backend without penalising the key); a thrown error is a
+   key-level failure that rotates the pool.
+2. Add its key-refs array and per-call timeout field to `lib/config.js` (both `.volatile()`).
+3. Add its id to `planFetchChain`'s fixed order in `lib/router.js`.
+
+**Boundary:** whole-site crawling, anti-bot handling, structured extraction and batch jobs do
+**not** belong here — they go to the firecrawl MCP. This plugin only routes a single-URL
+`web_fetch`. `lib/execute.js` needs no change.
 
 ## Install
 

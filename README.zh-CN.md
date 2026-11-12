@@ -43,7 +43,22 @@
 证明这一点。
 
 客户端的「API 密钥」卡片目前只列 Tavily / Firecrawl 两组；新增带 key 的供应商要先在
-`lib/client.js` 里加一组输入（`run` 与配置字段可以先落地，卡片可以后补）。
+`lib/client.js` 的 `KEY_GROUPS` 里加一行（`run` 与配置字段可以先落地，卡片可以后补）。
+
+## 新增抓取供应商
+
+抓取后端同样是**声明式注册**的（`lib/fetch-backends.js`），但抓取链是**固定顺序**
+（Tavily → Firecrawl → 本地 http），不开放给用户排序——保持可预测。要加一个抓取供应商：
+
+1. 在 `FETCH_BACKENDS` 里加一项：`id`、`label`、`keyRefsField`、`timeoutField`、
+   `defaultTimeoutMs`、`run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`。
+   `run` 返回 `{kind:'result', result}`（成功）或 `{kind:'unusable', reason}`（本后端没给出
+   可用内容，换下一个后端、不惩罚 key）；抛错则视为 key 级失败、换下一把。
+2. `lib/config.js` 加 key refs 数组与单次超时字段（都要 `.volatile()`）。
+3. 在 `lib/router.js` 的 `planFetchChain` 里把它的 id 加进固定顺序。
+
+**边界**：整站爬、反爬、结构化抽取、批量任务**不属于本插件**，交给 firecrawl MCP。
+本插件只是单 URL `web_fetch` 的一条路由。`lib/execute.js` 不改。
 
 ## 安装
 
