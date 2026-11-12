@@ -82,8 +82,9 @@ cannot be installed twice.
 
 #### Adding a search provider
 
-1. Register it in `lib/search-backends.js` — `run({apiKey, ctx, request, signal, timeoutMs})`;
-   add `isAvailable(ctx)` only if it is keyless.
+1. Register it in `lib/search-backends.js` — `run(args)`. A keyed backend receives
+   `{apiKey, ctx, request, signal, timeoutMs}`; a keyless one receives `{ctx, request, signal}`.
+   Add `isAvailable(ctx)` only if it is keyless.
 2. Add its config field(s) in `lib/config.js` (a `…ApiKeyRefs` string array for a keyed one).
 3. The user puts its `id` into `searchProviderOrder`, or config ships it as a default.
 4. `lib/client.js` `KEY_GROUPS` gets one line if it needs a key input in the settings card.

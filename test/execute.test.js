@@ -215,6 +215,28 @@ test('fetch: an already-aborted signal never reaches the network', async () => {
   }
 });
 
+test('search: an already-aborted signal never reaches the network', async () => {
+  const stub = stubFetch(() => {
+    throw new Error('should not be reached');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({}));
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(
+      () => router.search({ query: 'hello' }, controller.signal),
+      (error) => {
+        assert.equal(error.code, 'WEB_ABORTED');
+        return true;
+      },
+    );
+    assert.equal(stub.calls.length, 0);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('fetch: a budget too small to start a segment reports exhaustion', async () => {
   const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
   const router = createRouter(ctx, configWith({ totalBudgetMs: 1, tavilyTimeoutMs: 15_000 }));
