@@ -5,6 +5,7 @@ import { DEEPSEEK_DEFAULT_BASE_URL } from '@deepseek-ai/dsh-web-search-deepseek'
 
 import { Config } from '../lib/config.js';
 import { createRouter } from '../lib/execute.js';
+import { SEARCH_BACKENDS } from '../lib/search-backends.js';
 
 /**
  * 造一个最小 ctx。只提供插件真正读的四样：`credentials`、`settings`、
@@ -448,6 +449,34 @@ test('fetch: a Tavily error (not just unusable content) escalates to Firecrawl',
   } finally {
     stub.restore();
   }
+});
+
+test('search: a newly registered backend is picked up via searchProviderOrder with no code branch', async () => {
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ apiKey, request }) {
+      calls.push({ apiKey, query: request.query });
+      return { sources: [{ url: 'https://fake.example/x' }], truncated: false };
+    },
+  };
+  // 用普通对象配置，绕过 schema 里没有的 fakeApiKeyRefs——read() 直接读裸值即可。
+  const config = {
+    searchProviderOrder: ['fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/x');
+  assert.deepEqual(calls, [{ apiKey: 'fk', query: 'q' }]);
 });
 
 

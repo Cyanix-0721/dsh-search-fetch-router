@@ -10,7 +10,8 @@ environment) and the plugin only ever holds a reference name.
 
 ## Routing
 
-**Search** — Tavily key pool → the host's `deepseek-official` provider.
+**Search** — the provider order in `searchProviderOrder` (a Tavily key pool by default),
+optionally falling back to the host's `deepseek-official` provider.
 
 **Fetch** — one fixed chain: Tavily `/extract` → Firecrawl `/v2/scrape` → local `http`.
 
@@ -28,6 +29,28 @@ plugin's job. Use the firecrawl MCP tools for that.
 
 Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each backend gets
 `min(its own timeout, whatever is left)`; when less than 2 s remains, no new backend starts.
+
+## Adding a search provider
+
+Search backends are **declaratively registered** — the execution layer has no per-provider
+branch. To add one, touch three places:
+
+1. Add an entry to `SEARCH_BACKENDS` in `lib/search-backends.js`: `id`, `label`,
+   `keyRefsField`, `timeoutField`, `defaultTimeoutMs`, and `run({apiKey, request, signal,
+   timeoutMs})` returning the seam's `WebSearchResult`. For a host capability with no key
+   pool, set `keyRefsField: null` and implement `isAvailable(ctx)` instead.
+2. Add its key-refs array field and per-call timeout field to `lib/config.js` (both
+   `.volatile()`).
+3. Have the user put its `id` into `searchProviderOrder`.
+
+A keyed provider (`keyRefsField` non-null) automatically gets rotation / cooldown / dead-key
+skipping; a keyless one is called once behind `isAvailable`. `lib/execute.js` and
+`lib/router.js` need no change. See the "a newly registered backend is picked up …" test in
+`test/execute.test.js`, which proves it by injecting a registry.
+
+The **API keys** card in the browser bundle currently lists only Tavily / Firecrawl; a new
+keyed provider needs its own input group added in `lib/client.js` (the `run` and config
+fields can land first — the card can follow).
 
 ## Install
 
@@ -126,6 +149,7 @@ live.
 | `httpTimeoutMs` | `10000` | per-segment timeout |
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
 | `cooldownMs` | `60000` | how long a failed key sits out |
+| `searchProviderOrder` | `["tavily"]` | search provider ids, tried in order; `deepseek-official` is the fallback |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |

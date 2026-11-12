@@ -9,7 +9,7 @@
 
 ## 路由
 
-**搜索** —— Tavily key 池 → 宿主的 `deepseek-official`。
+**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 Tavily key 池），最后可回落宿主的 `deepseek-official`。
 
 **抓取** —— 固定一条链：Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`。
 
@@ -25,6 +25,25 @@
 
 每次抓取跑在一个硬预算下（`totalBudgetMs`，默认 45 秒）。每段拿
 `min(自己的超时, 剩余预算)`；剩余不足 2 秒就不再开新段。
+
+## 新增搜索供应商
+
+搜索后端是**声明式注册**的，执行层没有任何针对具体供应商的分支。要加一个供应商，只动三处：
+
+1. `lib/search-backends.js` 的 `SEARCH_BACKENDS` 里加一项：`id`、`label`、`keyRefsField`、
+   `timeoutField`、`defaultTimeoutMs`、`run({apiKey, request, signal, timeoutMs})`。
+   `run` 返回 seam 的 `WebSearchResult`。宿主自带、没有 key 池的能力把 `keyRefsField`
+   设成 `null`，改为实现 `isAvailable(ctx)`。
+2. `lib/config.js` 加该供应商的 key refs 数组字段与单次超时字段（都要 `.volatile()`）。
+3. 用户把它的 `id` 填进 `searchProviderOrder`。
+
+有 key 池的供应商（`keyRefsField` 非空）自动获得轮转 / 冷却 / 失效跳过；无 key 的走
+`isAvailable` 单次调用。`lib/execute.js` 与 `lib/router.js` 都不用改。测试见
+`test/execute.test.js` 里「a newly registered backend is picked up …」——它用注入注册表
+证明这一点。
+
+客户端的「API 密钥」卡片目前只列 Tavily / Firecrawl 两组；新增带 key 的供应商要先在
+`lib/client.js` 里加一组输入（`run` 与配置字段可以先落地，卡片可以后补）。
 
 ## 安装
 
@@ -112,6 +131,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `httpTimeoutMs` | `10000` | 单段超时 |
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
+| `searchProviderOrder` | `["tavily"]` | 搜索供应商尝试顺序，按 id；官方 `deepseek-official` 作兜底 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |

@@ -3,29 +3,59 @@ import { test } from 'node:test';
 
 import { planFetchChain, planSearchChain, segmentTimeout, shouldEscalate } from '../lib/router.js';
 
-test('search chain: Tavily first, official as fallback', () => {
+test('search chain: follows the configured order, official appended as fallback', () => {
+  const available = new Set(['tavily', 'deepseek-official']);
   assert.deepEqual(
-    planSearchChain({ hasTavily: true, hasOfficial: true, fallback: true }),
+    planSearchChain({ order: ['tavily'], isAvailable: (id) => available.has(id), fallback: true }),
     ['tavily', 'deepseek-official'],
   );
 });
 
 test('search chain: fallback disabled drops the official provider', () => {
+  const available = new Set(['tavily', 'deepseek-official']);
   assert.deepEqual(
-    planSearchChain({ hasTavily: true, hasOfficial: true, fallback: false }),
+    planSearchChain({ order: ['tavily'], isAvailable: (id) => available.has(id), fallback: false }),
     ['tavily'],
   );
 });
 
-test('search chain: no Tavily key reference leaves only the official provider', () => {
+test('search chain: an unavailable provider leaves only the official fallback', () => {
+  const available = new Set(['deepseek-official']);
   assert.deepEqual(
-    planSearchChain({ hasTavily: false, hasOfficial: true, fallback: true }),
+    planSearchChain({ order: ['tavily'], isAvailable: (id) => available.has(id), fallback: true }),
     ['deepseek-official'],
   );
 });
 
 test('search chain: nothing usable yields an empty chain', () => {
-  assert.deepEqual(planSearchChain({ hasTavily: false, hasOfficial: false, fallback: true }), []);
+  assert.deepEqual(
+    planSearchChain({ order: ['tavily'], isAvailable: () => false, fallback: true }),
+    [],
+  );
+});
+
+test('search chain: many providers keep order, dedupe, one official fallback at the end', () => {
+  const available = new Set(['tavily', 'brave', 'deepseek-official']);
+  assert.deepEqual(
+    planSearchChain({ order: ['brave', 'tavily', 'brave'], isAvailable: (id) => available.has(id), fallback: true }),
+    ['brave', 'tavily', 'deepseek-official'],
+  );
+});
+
+test('search chain: an id listed only as the fallback is not duplicated', () => {
+  const available = new Set(['deepseek-official']);
+  assert.deepEqual(
+    planSearchChain({ order: ['deepseek-official'], isAvailable: (id) => available.has(id), fallback: true }),
+    ['deepseek-official'],
+  );
+});
+
+test('search chain: an unknown id in the order is skipped', () => {
+  const available = new Set(['tavily', 'deepseek-official']);
+  assert.deepEqual(
+    planSearchChain({ order: ['nope', 'tavily'], isAvailable: (id) => available.has(id), fallback: true }),
+    ['tavily', 'deepseek-official'],
+  );
 });
 
 test('fetch chain: fixed order Tavily, Firecrawl, http', () => {
