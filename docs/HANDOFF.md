@@ -4,13 +4,15 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 90 全过。已**装进本机 web profile** 并通过
+插件已实现、已提交、已推到 GitHub，`npm test` 94 全过。已**装进本机 web profile** 并通过
 `dsh --dump-config` 静态验证（provider 已 pin 到 `search-fetch-router`），**待重启 DSH 后生效**。
 运行时真实搜索/抓取尚未验证；Tavily/Firecrawl key 是否已配未在会话内确认。
+搜索供应商已抽象成声明式注册表（`lib/search-backends.js`）+ 配置项 `searchProviderOrder`，
+新增供应商只加注册项与配置字段，执行层不动。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
 - 本地：`/home/slayer/repos/dsh-search-fetch-router`
-- 最新提交：以 `main` 为准（`git log --oneline -1`）；本次交接基线为 `3a4d6f9`
+- 最新提交：以 `main` 为准（`git log --oneline -1`）；搜索供应商注册表重构后基线为 `ab04abb`
 - 分支：`main`，已跟踪 `origin/main`
 
 ## 它做什么
@@ -19,7 +21,7 @@
 
 | 能力 | 链路 |
 | --- | --- |
-| 搜索 | Tavily key 池 → 宿主 `deepseek-official`（走 magpie 网关） |
+| 搜索 | 按 `searchProviderOrder`（默认 Tavily key 池）→ 宿主 `deepseek-official` 兜底 |
 | 抓取 | Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http` |
 
 Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可用内容
@@ -30,15 +32,23 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
 密钥不进任何 YAML。配置只存 credentials 引用名，插件经 credentials 服务解析，失败
 再回退环境变量层。
 
+搜索供应商是一张声明式注册表（`lib/search-backends.js`）+ 配置项 `searchProviderOrder`：
+新增供应商只加注册项与配置字段，`execute` / `router` 不动，`client.js` 的 `KEY_GROUPS`
+加一行即可让它出现在密钥卡片里。详见设计文档「Adding a search provider」。
+
 ## 已验证 / 未验证
 
 **已验证**
 
-- `npm test` → 90 pass / 0 fail（`node --test`，无框架依赖，约 145ms）。
+- `npm test` → 94 pass / 0 fail（`node --test`，无框架依赖，约 160ms）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
   `doesNotThrow`，搜索 provider 仍注册。teardown 时 effect 会注销两个 provider。
+- 搜索供应商注册表是数据驱动的：`test/execute.test.js` 把一个假 backend 注入
+  `createRouter(..., { searchBackends })` 并写进 `searchProviderOrder`，断言它进链并被调用；
+  `test/router.test.js` 覆盖 `planSearchChain` 新签名（去重 / 兜底 / 未知 id 跳过）。
+  client `RouterSettingsCard` 的密钥分组改由 `KEY_GROUPS` 驱动（行为不变，11 个 client 测试仍过）。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。

@@ -35,7 +35,9 @@ JavaScript. The user's actual usage is different:
 - Balance/quota awareness (`/usage` polling), call history, cross-month recovery probes.
   That is `dsh-tavily-pool`'s ~3000-line territory; this plugin deliberately stays small.
 - A custom settings panel. Every field is a `volatile` schema entry.
-- Search provider failover beyond Tavily → official.
+- A quota-aware scheduling or provider-ranking engine. The search chain is a plain,
+  user-ordered list (`searchProviderOrder`) that falls back to `deepseek-official` — adding a
+  provider is a registry entry, not a policy.
 - Replacing the host's tool layer (`web_search` / `web_fetch` tool names are unchanged).
 
 ## Architecture
@@ -44,6 +46,7 @@ JavaScript. The user's actual usage is different:
 index.js            apply(): register providers, nothing else
   └── lib/execute.js    execution: try each backend, degrade on failure
         ├── lib/router.js     pure decisions (chain order, escalation, budget slicing)
+        ├── lib/search-backends.js  declarative search backend registry (add a provider here)
         ├── lib/keyring.js    refs pool: rotate, cooldown, permanent death
         ├── lib/tavily.js     POST /search, POST /extract
         ├── lib/firecrawl.js  POST /v2/scrape
@@ -62,13 +65,32 @@ credentials service.
 
 ### Search
 
+Search backends are declarative. `lib/search-backends.js` holds a registry; each entry is
+`{id, label, keyRefsField|null, timeoutField|null, defaultTimeoutMs, isAvailable?, run()}`.
+The chain is built from the user's `searchProviderOrder` (default `["tavily"]`), then the
+`deepseek-official` fallback is appended when `searchFallback` is on. A keyed backend gets the
+`KeyRing` rotation/cooldown for free; a keyless one (`deepseek-official`) is called once.
+`lib/execute.js` and `lib/router.js` are data-driven and contain no `if (backend === ...)`.
+
 ```
-Tavily pool ──(all keys failed)──> deepseek-official
+searchProviderOrder: [ tavily, … ] ──(all keys failed)──> deepseek-official (fallback)
 ```
 
 `deepseek-official` is constructed directly (`new DeepSeekSearchProvider(resolveOptions)`)
 rather than re-registering its settings namespace — that namespace belongs to the host and
 cannot be installed twice.
+
+#### Adding a search provider
+
+1. Register it in `lib/search-backends.js` — `run({apiKey, ctx, request, signal, timeoutMs})`;
+   add `isAvailable(ctx)` only if it is keyless.
+2. Add its config field(s) in `lib/config.js` (a `…ApiKeyRefs` string array for a keyed one).
+3. The user puts its `id` into `searchProviderOrder`, or config ships it as a default.
+4. `lib/client.js` `KEY_GROUPS` gets one line if it needs a key input in the settings card.
+
+No change to `lib/execute.js` / `lib/router.js`. `test/execute.test.js` proves it: injecting a
+fake backend into `createRouter(..., { searchBackends })` and listing its id in
+`searchProviderOrder` is enough for it to enter the chain and be called.
 
 ### Fetch
 
@@ -193,10 +215,11 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 78 tests.
+`node --test`, no framework, no build step. 94 tests.
 
-- `test/router.test.js` — chain order, whitelist inversion, escalation signals, budget
-  slicing. Pure functions, no stubs.
+- `test/router.test.js` — data-driven chain order (`searchProviderOrder`, including dedupe and
+  the official fallback), whitelist inversion, escalation signals, budget slicing. Pure
+  functions, no stubs.
 - `test/urls.test.js` — glob semantics (`*` vs `**`), match surface, URL validation.
 - `test/keyring.test.js` — rotation, cooldown expiry, permanent death, unresolvable refs.
 - `test/firecrawl.test.js` — request body, response mapping, `metadata.statusCode` fallback.
@@ -205,6 +228,9 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
   bad key rolls to the next; all down names every backend; no-key-configured is
   actionable; invalid URL never reaches the network; aborted signal never reaches the
   network; budget exhaustion is distinguished from failure.
+- `test/execute.test.js` also proves the search registry extension point: a fake backend passed
+  via `createRouter(..., { searchBackends })` and named in `searchProviderOrder` enters the
+  chain and is called, with no code branch to add.
 
 CI runs on Node 22 and 24, installing host packages from the `next` dist-tag (the `latest`
 tag still points at the broken 0.0.1-rc.1 line, which depends on the unpublished
