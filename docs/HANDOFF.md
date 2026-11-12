@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 100 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 101 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
@@ -40,7 +40,7 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
 
 **已验证**
 
-- `npm test` → 100 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 101 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
@@ -51,6 +51,7 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
   client `RouterSettingsCard` 的密钥分组改由 `KEY_GROUPS` 驱动（行为不变，11 个 client 测试仍过）。
 - 抓取后端同样是数据驱动的（`lib/fetch-backends.js` + `test/fetch-backends.test.js` 契约测试）：
   `lib/execute.js` 的 fetch 循环已无 `if (backend === ...)` 分支，与重构前逐字对齐（既有降级路径测试全过）。
+- 执行层的「后端归属」有 debug 日志（`note()`），并有测试锁住（`test/execute.test.js` 断言 debug 行含 `served by fake`）。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。
@@ -69,8 +70,9 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
 
 **未验证**（这是下一阶段的主要工作）
 
-- **逐后端归属未确认**：`web_search`/`web_fetch` 已能正常返回，但未核对每次实际走的是
-  Tavily / Firecrawl / 官方 / 本地 http 哪一档（需看 DSH 日志，或在 `execute.js` 加 debug 日志）。
+- **逐后端归属需靠 debug 日志看**：执行层已加 `note()`（`lib/execute.js`），成功/失败都会
+  `ctx.logger.debug('dsh-search-fetch-router: web_search served by <id> ...')`；宿主 logger 未开
+  debug 级别时看不到，这只是观测点、不影响路由。
 - 未在会话内确认 `~/.dsh/.credentials.yaml` 是否已有 `TAVILY_API_KEY` / `FIRECRAWL_API_KEY`
   （该文件被 `secret.deny-path` 拦截，agent 读不到）。缺 key 时搜索回落官方、抓取回落本地 http。
 - 本地 HTTP 回落（`HttpFetchProvider`）**成功路径没有单测**：它内部用

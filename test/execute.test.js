@@ -13,14 +13,14 @@ import { SEARCH_BACKENDS } from '../lib/search-backends.js';
  * @param options - `{credentials, settings}`。
  * @returns 假 ctx。
  */
-function fakeCtx({ credentials, settings } = {}) {
+function fakeCtx({ credentials, settings, logger } = {}) {
   return {
     get(name) {
       if (name === 'credentials') return credentials;
       if (name === 'settings') return settings;
       return undefined;
     },
-    logger: { warn() {} },
+    logger: logger ?? { warn() {} },
   };
 }
 
@@ -526,6 +526,34 @@ test('search: an unknown id in searchProviderOrder is skipped, not fatal', async
   const result = await router.search({ query: 'q' }, undefined);
   assert.equal(result.sources[0].url, 'https://fake.example/ok');
   assert.deepEqual(calls, [{ apiKey: 'fk', query: 'q' }], 'ghost is skipped, only fake runs');
+});
+
+test('search: debug log records which backend served the request', async () => {
+  const debugLines = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run() {
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    searchProviderOrder: ['fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const ctx = fakeCtx({
+    credentials: fakeCredentials({ FAKE_KEY: 'fk' }),
+    logger: { warn() {}, debug: (message) => debugLines.push(message) },
+  });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q' }, undefined);
+  assert.ok(debugLines.some((line) => line.includes('served by fake')), debugLines.join('\n'));
 });
 
 
