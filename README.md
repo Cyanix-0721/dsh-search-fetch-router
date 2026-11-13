@@ -172,6 +172,7 @@ live.
 | `totalBudgetMs` | `45000` | hard cap for one fetch |
 | `tavilyTimeoutMs` | `15000` | per-segment timeout |
 | `exaTimeoutMs` | `15000` | per-segment timeout (Exa) |
+| `exaSearchType` | `auto` | Exa search mode: `instant`/`fast`/`auto`/`deep-lite`/`deep`/`deep-reasoning` — later ones cost more and run slower |
 | `firecrawlTimeoutMs` | `30000` | per-segment timeout |
 | `httpTimeoutMs` | `10000` | per-segment timeout |
 | `maxBodyChars` | `100000` | truncation point for returned bodies |

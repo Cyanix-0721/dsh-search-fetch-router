@@ -41,3 +41,25 @@ test('search registry: lookup returns the entry, or undefined for unknown ids', 
   assert.equal(lookupSearchBackend('exa'), SEARCH_BACKENDS.exa);
   assert.equal(lookupSearchBackend('nope'), undefined);
 });
+
+test('search registry: the exa entry reads its search type from config, not a constant', async () => {
+  const original = globalThis.fetch;
+  const bodies = [];
+  globalThis.fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return Response.json({ results: [] });
+  };
+  try {
+    const read = (key) => (key === 'exaSearchType' ? 'instant' : undefined);
+    await SEARCH_BACKENDS.exa.run({
+      apiKey: 'ek',
+      request: { query: 'q' },
+      signal: undefined,
+      timeoutMs: 1_000,
+      read,
+    });
+    assert.equal(bodies[0].type, 'instant');
+  } finally {
+    globalThis.fetch = original;
+  }
+});

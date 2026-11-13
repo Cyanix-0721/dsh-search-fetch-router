@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { contentsExa, searchExa } from '../lib/exa.js';
+import { EXA_SEARCH_TYPES, contentsExa, normalizeSearchType, searchExa } from '../lib/exa.js';
 
 /** 替换 globalThis.fetch，记录调用，测试后恢复。 */
 function stubFetch(handler) {
@@ -144,4 +144,32 @@ test('exa contents: a non-2xx response throws with the HTTP status', async () =>
   } finally {
     stub.restore();
   }
+});
+
+test('exa: forwards the configured search type', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    await searchExa({ apiKey: 'ek', query: 'q', timeoutMs: 1_000, type: 'fast' });
+    assert.equal(JSON.parse(stub.calls[0].init.body).type, 'fast');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa: an unknown search type falls back to auto instead of failing upstream', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    await searchExa({ apiKey: 'ek', query: 'q', timeoutMs: 1_000, type: 'nope' });
+    assert.equal(JSON.parse(stub.calls[0].init.body).type, 'auto');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa: normalizeSearchType accepts only the documented values', () => {
+  for (const type of EXA_SEARCH_TYPES) assert.equal(normalizeSearchType(type), type);
+  assert.equal(normalizeSearchType(undefined), 'auto');
+  assert.equal(normalizeSearchType(''), 'auto');
+  assert.equal(normalizeSearchType('AUTO'), 'auto');
+  assert.equal(normalizeSearchType(42), 'auto');
 });

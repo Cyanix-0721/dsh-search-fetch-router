@@ -147,6 +147,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `totalBudgetMs` | `45000` | 单次抓取硬上限 |
 | `tavilyTimeoutMs` | `15000` | 单段超时 |
 | `exaTimeoutMs` | `15000` | Exa 单段超时 |
+| `exaSearchType` | `auto` | Exa 搜索档位：`instant`/`fast`/`auto`/`deep-lite`/`deep`/`deep-reasoning`，越靠后越贵越慢 |
 | `firecrawlTimeoutMs` | `30000` | 单段超时 |
 | `httpTimeoutMs` | `10000` | 单段超时 |
 | `maxBodyChars` | `100000` | 返回正文的截断点 |

@@ -9,6 +9,16 @@
 
 - 收集 `0.1.0-alpha.0` 的反馈，稳定后发布 `0.1.0`。
 
+## [Unreleased]
+
+### Added
+
+- `exaSearchType` 配置项：Exa 搜索档位可选 `instant` / `fast` / `auto` / `deep-lite` / `deep` /
+  `deep-reasoning`（默认 `auto`）。档位直接影响价格与延迟，此前写死 `auto`。非法值按 `auto`
+  处理，不会把未知档位发给上游（上游对未知 `type` 返回 400，会让整次搜索失败）。
+- 执行层把 `read` 传给搜索后端，后端可从配置读自己的调参项，不必为每个参数加一条
+  `if (backend === ...)` 分支。
+
 ## [0.1.0-alpha.0] - 2026-11-13
 
 首个可用版本。
