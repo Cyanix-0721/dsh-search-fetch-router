@@ -160,6 +160,39 @@ test('exa contents: a successful status yields no failure reason', async () => {
   }
 });
 
+test('exa contents: statuses are matched by url, not by position', async () => {
+  // 上游按请求里的 urls 回填 statuses，别人的失败可能排在前面。按位置取就会
+  // 把另一条 URL 的失败安到自己头上，报出一个和本次请求无关的原因。
+  const stub = stubFetch(() => Response.json({
+    results: [{ url: 'https://a.example', text: 'ok' }],
+    statuses: [
+      { id: 'https://b.example', status: 'error', error: { tag: 'CRAWL_NOT_FOUND' } },
+      { id: 'https://a.example', status: 'success', source: 'cached' },
+    ],
+  }));
+  try {
+    const { content, failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(content, 'ok');
+    assert.equal(failure, undefined);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: falls back to the first failure when no status matches the url', async () => {
+  // 匹配不到自己的条目时，宁可用第一条失败原因，也不要静默成「空正文」。
+  const stub = stubFetch(() => Response.json({
+    results: [],
+    statuses: [{ id: 'https://b.example', status: 'error', error: { tag: 'CRAWL_TIMEOUT' } }],
+  }));
+  try {
+    const { failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(failure, 'CRAWL_TIMEOUT');
+  } finally {
+    stub.restore();
+  }
+});
+
 test('exa contents: a non-2xx response throws with the HTTP status', async () => {
   const stub = stubFetch(() => new Response('nope', { status: 500 }));
   try {
