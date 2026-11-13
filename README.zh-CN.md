@@ -163,7 +163,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
-| `providerOrder` | `["tavily", "exa"]` | 搜索供应商尝试顺序 = 启用顺序；没配 key 的运行时跳过。插件页的排序/停用改的就是它；官方 `deepseek-official` 作兜底 |
+| `providerOrder` | `["tavily", "exa", "firecrawl"]` | 供应商启用顺序，**搜索与抓取共用**；没配 key 的运行时跳过。插件页的排序/停用改的就是它。兜底是官方 `deepseek-official`（搜索）与本地 `http`（抓取） |
 | `keyNotes` | `{}` | 每把 key 的本机备注（ref→一句话），只展示不参与请求 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |

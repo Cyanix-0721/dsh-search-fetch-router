@@ -190,7 +190,7 @@ live.
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
-| `providerOrder` | `["tavily", "exa"]` | search provider ids = enable order; keyless ones are skipped at runtime. The card's reorder/disable edits this list; `deepseek-official` is the fallback |
+| `providerOrder` | `["tavily", "exa", "firecrawl"]` | provider ids in enable order — used by **both** search and fetch; providers without a key are skipped at runtime. The card's reorder/disable edits this list. `deepseek-official` (search) and local `http` (fetch) are the fallbacks |
 | `keyNotes` | `{}` | per-key local notes (ref → one line), display only |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
