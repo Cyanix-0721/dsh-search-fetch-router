@@ -793,3 +793,39 @@ test('fetch: a keyless backend that reports itself unavailable is skipped, not c
   );
   assert.deepEqual(seen, [], 'an unavailable backend must never be invoked');
 });
+
+test('fetch: a keyless backend reporting unusable hands over instead of returning undefined', async () => {
+  const empty = {
+    id: 'emptykeyless',
+    label: 'Empty keyless',
+    keyRefsField: null,
+    timeoutField: 'emptyTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run() {
+      return { kind: 'unusable', reason: 'nothing to extract' };
+    },
+  };
+  const good = {
+    id: 'goodkeyless',
+    label: 'Good keyless',
+    keyRefsField: null,
+    timeoutField: 'goodTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ request }) {
+      return {
+        kind: 'result',
+        result: {
+          url: request.url,
+          statusCode: 200,
+          body: { kind: 'text', content: 'fallback body' },
+          truncated: false,
+        },
+      };
+    },
+  };
+  const config = { providerOrder: ['emptykeyless', 'goodkeyless'], fetchFallback: false, maxBodyChars: 100_000, totalBudgetMs: 45_000 };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { fetchBackends: { emptykeyless: empty, goodkeyless: good } });
+  const result = await router.fetch({ url: 'https://fake.example/k' }, undefined);
+  assert.equal(result.body.content, 'fallback body');
+});
