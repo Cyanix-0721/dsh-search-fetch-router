@@ -5,9 +5,7 @@
 
 ## [Unreleased]
 
-### 计划
-
-- 发布到 npm（包名尚未最终确定）。
+暂无。本插件仅从 git 仓库分发，不发布到 npm（`package.json` 已设 `"private": true`）。
 
 ## [0.1.0] - 未发布
 

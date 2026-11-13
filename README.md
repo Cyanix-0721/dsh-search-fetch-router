@@ -79,7 +79,7 @@ Fetch backends are **declaratively registered** in `lib/fetch-backends.js` and s
 
 ## Install
 
-Not on npm yet (the npm package name is still being decided) — install straight from the repository:
+This plugin is distributed from the git repository only (not published to npm) — install straight from the repo:
 
 ```bash
 npx --yes @deepseek-ai/dsh plugin --profile web add \
