@@ -9,7 +9,7 @@
 
 ## 路由
 
-**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 `["tavily", "exa"]`，没配 key 的供应商运行时自动跳过），最后可回落宿主的 `deepseek-official`。插件页的密钥卡片可对搜索供应商排序、停用、写备注，并显示已保存 key 的掩码预览。
+**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 `["tavily", "exa"]`，没配 key 的供应商运行时自动跳过），最后可回落宿主的 `deepseek-official`。插件页的密钥卡片可对搜索供应商拖拽或上下箭头排序、停用、写备注，并显示已保存 key 的掩码预览。
 
 **抓取** —— 固定一条链：Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`。
 

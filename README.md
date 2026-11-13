@@ -12,7 +12,7 @@ environment) and the plugin only ever holds a reference name.
 
 **Search** — the provider order in `searchProviderOrder` (default `["tavily", "exa"]`;
 providers without a key are skipped at runtime), optionally falling back to the host's
-`deepseek-official` provider. The plugin-page key card lets you reorder, disable, and add a
+`deepseek-official` provider. The plugin-page key card lets you reorder (drag or arrows), disable, and add a
 note to each search provider, and shows a masked preview of each stored key.
 
 **Fetch** — one fixed chain: Tavily `/extract` → Firecrawl `/v2/scrape` → local `http`.

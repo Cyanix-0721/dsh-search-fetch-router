@@ -438,6 +438,26 @@ test('client: move down reorders searchProviderOrder', async () => {
   ]);
 });
 
+test('client: rendered search-provider order follows searchProviderOrder', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations } = fakeContext({
+    tavilyApiKeyRefs: ['TAVILY_API_KEY'],
+    exaApiKeyRefs: ['EXA_API_KEY'],
+    firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
+    searchProviderOrder: ['exa', 'tavily'],
+  });
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({ subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } } });
+  const tree = element.type(element.props);
+  assert.deepEqual(
+    collectKeyInputs(tree).map((i) => i.props['data-sfr-key']),
+    ['EXA_API_KEY', 'TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
+    'groups render in searchProviderOrder, then fetch groups',
+  );
+});
+
 test('client: KeyField shows the masked preview and a note input', () => {
   const { captured, require } = loadBundle();
   const exported = captured.factory(require);
