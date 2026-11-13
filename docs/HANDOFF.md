@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 123 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 169 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
@@ -39,7 +39,7 @@
 
 **已验证**
 
-- `npm test` → 123 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 169 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
@@ -51,13 +51,25 @@
 - 抓取后端同样是数据驱动的（`lib/fetch-backends.js` + `test/fetch-backends.test.js` 契约测试）：
   `lib/execute.js` 的 fetch 循环已无 `if (backend === ...)` 分支，与重构前逐字对齐（既有降级路径测试全过）。
 - 新增可选的 Exa 搜索供应商（keyed，`lib/exa.js`，注册进 `SEARCH_BACKENDS`）；`execute.search` 加了与抓取对称的总预算 `searchTotalBudgetMs`，耗尽抛 `WEB_SEARCH_BUDGET_EXHAUSTED`。
-- 搜索与抓取已合并成一张 `providerOrder`：Firecrawl 补了 `/v2/search` 搜索、Exa 补了 `/contents` 抓取，`planFetchChain` 改成与 `planSearchChain` 同构的数据驱动签名；`npm test` 123。
+- 搜索与抓取已合并成一张 `providerOrder`：Firecrawl 补了 `/v2/search` 搜索、Exa 补了 `/contents` 抓取，`planFetchChain` 改成与 `planSearchChain` 同构的数据驱动签名。
 - 执行层的「后端归属」有 debug 日志（`note()`），并有测试锁住（`test/execute.test.js` 断言 debug 行含 `served by fake`）。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
 - 池状态跨调用存活有两条测试锁住（游标前进、失败 key 下次跳过）。
 - 官方回落读 `web-search-deepseek` 段：有 settings 时请求打到配置的 `baseURL`，没有时
   回落 `DEEPSEEK_DEFAULT_BASE_URL`（2026-11-10 补测，见 `test/execute.test.js`）。
+- 三家供应商共用一层 JSON POST 底座（`lib/rest.js`）：超时组合、非 2xx 错误体、
+  `status` / `Retry-After` 挂载只写一份。此前是逐字重复的三份，给 Tavily 加 `Retry-After`
+  时 Exa / Firecrawl 没跟上，同一类失败在 key 池里出现两种冷却时长。
+- 调用方取消原样透传（`lib/rest.js`）：`postJson` 曾把 `AbortError` 包成普通 `Error`，
+  上层靠 `error.name` 判断取消，包装后认不出——取消会被记成后端失败、惩罚 key、继续打下一家。
+- 本地 http 兜底会跟随跨域重定向（`lib/fetch-backends.js` 的 `fetchFollowingCrossOrigin`）：
+  宿主只跟同源跳转，实测 `docs.exa.ai` → `exa.ai` 会让整次抓取失败。最多三跳、记录已访问
+  URL 防成环，每跳仍走宿主 `fetch`，URL 安全校验不被绕过。
+- `User-Agent` 版本号与 `package.json` 一致，且只在 `lib/rest.js` 定义一处（`test/rest.test.js` 守住）。
+- 配置里的枚举字段（`exaSearchType` / `tavilyExtractDepth`）都改成了 `z.string()` + 读取时规整：
+  **Config 校验抛错会连带整个插件加载失败**，而两条链都被 pin 到本插件，一个手改 YAML 的
+  拼写错误不该把 `web_search`/`web_fetch` 一起弄挂。
 - 关键降级路径均有测试：`maxBodyChars` 截断置 `truncated`、Tavily 报错（非内容不可用）
   升级 Firecrawl、Tavily 全失败回落官方。
 - **已装进 `~/.dsh/profiles/web`**（2026-11-11）：
@@ -91,12 +103,20 @@
    `cat` 这个文件。**
 3. **跑通真实请求。** 一次 `web_search`、一次普通页 `web_fetch`，以及一次反爬/JS 重的页
    （确认 Tavily 拿不到时能降到 Firecrawl），确认各条路径都走到。
-4. **补 CI。** ~~已完成。~~ `gh auth refresh -s workflow` 后 `.github/workflows/ci.yml`
-   已提交并推送（`66627ea`）。注意：工作流能被 GitHub 接收，但因**账号级 billing
-   lock**（`The job was not started because your account is locked due to a billing
-   issue.`）runner 起不来，与仓库公开与否、与 workflow 配置都无关，需用户处理账号账单。
-5. **发布到 npm。** 包名 `dsh-search-fetch-router` 目前 404，可用。发了之后
-   README 的安装段可以从 `github:` 改成包名。
+4. **CI 已就绪但跑不起来。** `.github/workflows/ci.yml` 已提交并推送（`66627ea`），
+   工作流能被 GitHub 接收，但因**账号级 billing lock**（`The job was not started
+   because your account is locked due to a billing issue.`）runner 起不来，与仓库公开
+   与否、与 workflow 配置都无关，需用户处理账号账单。本地等价验证靠
+   `prepublishOnly: npm test`。
+5. **npm 发布已准备好，但搁置。** `package.json` 是 `0.1.0-alpha.0`、`private` 已移除、
+   `files` 白名单已收好（`npm pack --dry-run` 20 文件 / 45 kB，不含 test 与 node_modules）。
+   包名 `dsh-search-fetch-router` 未被占。**卡在登录**：`npm whoami` 仍是 `ENEEDAUTH`，
+   首次登录要邮件 OTP，而当时 Microsoft 365 / Exchange Online 大范围故障导致 OTP 邮件延迟
+   几十分钟。绕路：浏览器开 npmjs.com/settings/~/tokens 生成 **Automation token**（不需
+   OTP），`npm config set //registry.npmjs.org/:_authToken=<token>` 后
+   `pnpm publish --tag alpha --no-git-checks`，用完 revoke。
+   注意：本机 `npm pack --dry-run` 需要 `--cache "$(pwd)/.tmp-npm-cache"`
+   （默认 cache 目录只读，EROFS `/home/slayer/.npm/_cacache/tmp`）。
 
 ## 装 / 卸载到 profile
 
