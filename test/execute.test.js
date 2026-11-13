@@ -1107,3 +1107,92 @@ test('note: a throwing logger never breaks the request', async () => {
   const result = await router.search({ query: 'q' }, undefined);
   assert.equal(result.sources[0].url, 'https://fake.example/log');
 });
+
+test('search: an unregistered provider id in providerOrder is skipped with a warn', async () => {
+  const warns = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run() {
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    providerOrder: ['tavlp', 'fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const ctx = fakeCtx({
+    credentials: fakeCredentials({ FAKE_KEY: 'fk' }),
+    logger: { warn: (message) => warns.push(message), debug() {} },
+  });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/ok');
+  assert.ok(
+    warns.some((line) => line.includes('tavlp') && line.includes('未注册')),
+    `expected a warning about the unknown id, got: ${warns.join(' | ')}`,
+  );
+});
+
+test('search: maxResults is capped by maxSearchResults and respects a smaller request value', async () => {
+  const seen = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ request }) {
+      seen.push(request.maxResults);
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    providerOrder: ['fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+    maxSearchResults: 10,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q', maxResults: 50 }, undefined);
+  await router.search({ query: 'q', maxResults: 3 }, undefined);
+  await router.search({ query: 'q' }, undefined);
+  assert.deepEqual(seen, [10, 3, 10]);
+});
+
+test('search: maxSearchResults defaults to 20 when the config field is absent', async () => {
+  const seen = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ request }) {
+      seen.push(request.maxResults);
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    providerOrder: ['fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+    // maxSearchResults 故意不写：走 readNumber 的兜底默认值
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q', maxResults: 50 }, undefined);
+  await router.search({ query: 'q' }, undefined);
+  assert.deepEqual(seen, [20, 20]);
+});

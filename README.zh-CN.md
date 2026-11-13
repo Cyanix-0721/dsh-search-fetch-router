@@ -165,6 +165,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `firecrawlTimeoutMs` | `30000` | 单段超时 |
 | `httpTimeoutMs` | `10000` | 单段超时 |
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
+| `maxSearchResults` | `20` | 单次搜索向每家供应商请求的结果条数上限；请求里更小的 `maxResults` 会被尊重 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | 供应商启用顺序，**搜索与抓取共用**；没配 key 的运行时跳过。插件页的排序/停用改的就是它。兜底是官方 `deepseek-official`（搜索）与本地 `http`（抓取） |
