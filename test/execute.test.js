@@ -555,6 +555,8 @@ test('search: debug log records which backend served the request', async () => {
   const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
   await router.search({ query: 'q' }, undefined);
   assert.ok(debugLines.some((line) => line.includes('served by fake')), debugLines.join('\n'));
+  // 命中日志带耗时，便于排查每个后端到底慢在哪。
+  assert.match(debugLines.join('\n'), /served by fake \(key FAKE_KEY\) in \d+ms/);
 });
 
 test('search: exa is used when listed in providerOrder', async () => {

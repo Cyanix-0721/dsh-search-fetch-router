@@ -83,6 +83,20 @@ test('ring: references resolving to an empty string count as unconfigured', asyn
   assert.deepEqual(await keyring.resolvedCandidates(0), []);
 });
 
+test('ring: resolution preserves ref order even when values resolve out of order', async () => {
+  // A 最慢、B 最快、C 中间——并行解析完成顺序是 B/C/A，但输出必须按 refs 原序。
+  const delays = { A: 30, B: 0, C: 10 };
+  const keyring = ring(['A', 'B', 'C'], async (ref) => {
+    await new Promise((resolve) => setTimeout(resolve, delays[ref]));
+    return `v-${ref}`;
+  });
+  assert.deepEqual(await keyring.resolvedCandidates(0), [
+    { ref: 'A', value: 'v-A' },
+    { ref: 'B', value: 'v-B' },
+    { ref: 'C', value: 'v-C' },
+  ]);
+});
+
 test('ring: hasAnyConfigured ignores cooldowns but respects permanent failures', async () => {
   const keyring = ring(['A'], async () => 'v');
   keyring.penalize('A', { status: 500, message: 'boom' }, 0);
