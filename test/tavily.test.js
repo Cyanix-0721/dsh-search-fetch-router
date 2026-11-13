@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractTavily, searchTavily } from '../lib/tavily.js';
+import { extractTavily, normalizeExtractDepth, searchTavily } from '../lib/tavily.js';
 
 /**
  * 用一个假的 `fetch` 替换全局，记录调用参数并回放给定响应。
@@ -224,4 +224,17 @@ test('search: max_results is clamped to the documented 20', async () => {
   } finally {
     stub.restore();
   }
+});
+
+test('tavily: normalizeExtractDepth only ever yields basic or advanced', () => {
+  // 配置字段是 z.string()（枚举会在 schema 校验阶段抛错，Config 抛错会让整个插件加载失败），
+  // 所以规整必须在这里兜住：任何坏值都不能变成上游不认识的 depth（那会换来 400）。
+  assert.equal(normalizeExtractDepth('advanced'), 'advanced');
+  assert.equal(normalizeExtractDepth(' ADVANCED '), 'advanced');
+  assert.equal(normalizeExtractDepth('Advanced'), 'advanced');
+  assert.equal(normalizeExtractDepth('basic'), 'basic');
+  assert.equal(normalizeExtractDepth('advnaced'), 'basic');
+  assert.equal(normalizeExtractDepth(''), 'basic');
+  assert.equal(normalizeExtractDepth(undefined), 'basic');
+  assert.equal(normalizeExtractDepth(42), 'basic');
 });

@@ -41,6 +41,11 @@
   key、继续往下一家打。现在取消原样抛。
 - `User-Agent` 的版本号与 `package.json` 对齐（此前停在 `0.1.0`，实际已是 `0.1.0-alpha.0`），
   并集中到 `lib/rest.js` 一处定义，由测试比对 `package.json` 守住。
+- `tavilyExtractDepth` 改为 `z.string()` + 读取时规整（`normalizeExtractDepth`），不再用枚举：
+  枚举会让一个拼错的值在 schema 校验阶段抛错，而 Config 抛错会连带整个插件加载失败——搜索与
+  抓取两条链都被 pin 到本插件，等于把 `web_search`/`web_fetch` 一起弄挂。坏值现在按 `basic`
+  处理，大小写不敏感。
+- `exaSearchType` 的规整同样大小写不敏感（`Auto` / ` AUTO ` 都按 `auto`），此前只 trim。
 - 客户端卡片「默认供应商顺序」改为从供应商表派生：此前另有一份手写字面量，加供应商时漏改
   会出现「卡片认这家、兜底顺序不认」的错位。
 - Tavily `/extract` 请求体带服务端 `timeout`（秒，夹在官方 1–60 内）：此前只有本地 AbortSignal，
