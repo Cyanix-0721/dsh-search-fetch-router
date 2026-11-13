@@ -485,3 +485,18 @@ test('client: KeyField shows the masked preview and a note input', () => {
   assert.equal(noteInputs.length, 1);
   assert.equal(noteInputs[0].props.defaultValue, 'work account');
 });
+
+test('client: provider ordering helpers (toggle / move-before / swap / merge)', () => {
+  const { captured, require } = loadBundle();
+  const { mergeKnown, applyProviderToggle, moveItemBefore, swapItem } = captured.factory(require).__test;
+
+  assert.deepEqual(mergeKnown(['tavily'], ['custom']), ['tavily', 'custom']);
+  assert.deepEqual(applyProviderToggle(['a', 'b'], 'c', true), ['a', 'b', 'c']);
+  assert.deepEqual(applyProviderToggle(['a', 'b'], 'a', true), ['a', 'b']); // already on
+  assert.deepEqual(applyProviderToggle(['a', 'b'], 'a', false), ['b']);
+  assert.deepEqual(moveItemBefore(['a', 'b', 'c'], 'c', 'a'), ['c', 'a', 'b']);
+  assert.deepEqual(moveItemBefore(['a', 'b', 'c'], 'a', 'c'), ['b', 'a', 'c']);
+  assert.deepEqual(moveItemBefore(['a', 'b'], 'a', 'a'), ['a', 'b']); // no-op
+  assert.deepEqual(swapItem(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c']);
+  assert.deepEqual(swapItem(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c']); // out of range
+});
