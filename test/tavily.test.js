@@ -212,3 +212,16 @@ test('a response without Retry-After leaves the hint unset', async () => {
     stub.restore();
   }
 });
+
+test('search: max_results is clamped to the documented 20', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    await searchTavily({ apiKey: 'k', query: 'q', maxResults: 50, ...options });
+    assert.equal(JSON.parse(stub.calls[0].init.body).max_results, 20);
+
+    await searchTavily({ apiKey: 'k', query: 'q', maxResults: 7, ...options });
+    assert.equal(JSON.parse(stub.calls[1].init.body).max_results, 7);
+  } finally {
+    stub.restore();
+  }
+});
