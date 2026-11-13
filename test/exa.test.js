@@ -172,4 +172,7 @@ test('exa: normalizeSearchType accepts only the documented values', () => {
   assert.equal(normalizeSearchType(''), 'auto');
   assert.equal(normalizeSearchType('AUTO'), 'auto');
   assert.equal(normalizeSearchType(42), 'auto');
+  // 手改配置常带空格：trim 后合法就照用，而不是悄悄退回 auto 让用户以为档位没生效。
+  assert.equal(normalizeSearchType(' deep-lite '), 'deep-lite');
+  assert.equal(normalizeSearchType('  '), 'auto');
 });
