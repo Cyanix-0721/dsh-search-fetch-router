@@ -191,6 +191,17 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `WEB_INVALID_QUERY` | 搜索 query 为空或全是空白 |
 | `WEB_ABORTED` | 调用方取消 |
 
+### 排查一次失败
+
+把 `verboseLog` 打开，就能在日志里看到每次请求由哪个后端服务、耗时多少（`web_search served by tavily (key TAVILY_API_KEY) in 812ms`）；全失败时是一行 `... all backends failed: <summary>`，逐家写明原因。
+
+- `*_ALL_PROVIDERS_FAILED` —— 看报错里的 `summary`，它逐家列了错误。多数是 key 空/无效、额度用尽，或供应商故障。先核 key 的值和卡片上给每把 key 写的备注。
+- `*_BUDGET_EXHAUSTED` —— 预算在任何一个后端跑完前就耗尽：多半是供应商/key 太多，或有后端太慢。调大 `searchTotalBudgetMs` / `totalBudgetMs`，或调小各家的单次超时。
+- `WEB_INVALID_URL` —— 只抓 `http(s)`、且不带内嵌凭据的 URL。
+- `WEB_ABORTED` —— 调用方取消了请求，不是插件故障。
+
+抓 JS 重、或跨域跳转的页面本就受限；超出「单个 URL 的正文」的需求，用 firecrawl MCP。
+
 ## 回滚
 
 把两个 provider 字段指回宿主自己的——**两行都要写**，因为 id-targeted 的 `config`

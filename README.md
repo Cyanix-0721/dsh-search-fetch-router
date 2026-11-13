@@ -218,6 +218,17 @@ Failures carry a stable `code`, surfaced in the tool's structured error metadata
 | `WEB_INVALID_QUERY` | empty or blank search query |
 | `WEB_ABORTED` | the caller cancelled |
 
+### Debugging a failure
+
+Set `verboseLog` to `true` to get one line per request naming the backend that served it and how long it took (`web_search served by tavily (key TAVILY_API_KEY) in 812ms`), or — when everything failed — a `... all backends failed: <summary>` line where each provider's error is spelled out.
+
+- `*_ALL_PROVIDERS_FAILED` — read the `summary`; it lists every provider's error. Usually an empty/invalid key, a quota-exhausted key, or a provider outage. Check the key values and the per-key notes on the card.
+- `*_BUDGET_EXHAUSTED` — the budget ran out before any provider finished; usually too many providers/keys for the budget, or one slow provider. Raise `searchTotalBudgetMs` / `totalBudgetMs`, or lower the per-provider timeouts.
+- `WEB_INVALID_URL` — only `http(s)` URLs without embedded credentials are fetched.
+- `WEB_ABORTED` — the caller cancelled the request; not a plugin failure.
+
+A JS-heavy or cross-origin-redirecting page is expected to be limited; for anything beyond a single URL's content, use the firecrawl MCP tools.
+
 ## Rolling back
 
 Point the two provider fields back at the host's own providers — keep **both** lines,
