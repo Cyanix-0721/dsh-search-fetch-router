@@ -49,6 +49,7 @@ index.js            apply(): register providers, nothing else
         ├── lib/search-backends.js  declarative search backend registry (add a provider here)
         ├── lib/fetch-backends.js   declarative fetch backend registry (single-URL only)
         ├── lib/keyring.js    refs pool: rotate, cooldown, permanent death
+        ├── lib/rest.js       shared JSON-POST base: timeout, non-2xx, Retry-After, UA
         ├── lib/tavily.js     POST /search, POST /extract
         ├── lib/exa.js        POST /search, POST /contents
         ├── lib/firecrawl.js  POST /v2/scrape, POST /v2/search
@@ -244,7 +245,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 112 tests.
+`node --test`, no framework, no build step. 169 tests.
 
 - `test/router.test.js` — data-driven search chain order (`providerOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.

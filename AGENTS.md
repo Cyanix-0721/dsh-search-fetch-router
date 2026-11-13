@@ -55,6 +55,7 @@ lib/search-backends.js 声明式搜索后端注册表：加供应商只改这里
 lib/fetch-backends.js 声明式抓取后端注册表：只做单 URL 基础抓取，执行层同样不改
 lib/urls.js           URL 校验（长度 / 协议 / 内嵌凭据）
 lib/keyring.js        refs 池：轮转 / 冷却 / 永久失效
+lib/rest.js          三家共用的 JSON POST 底座：超时组合 / 非 2xx / Retry-After / UA
 lib/tavily.js         /search 与 /extract 的 REST
 lib/exa.js            /search 与 /contents 的 REST
 lib/firecrawl.js      /v2/scrape 与 /v2/search 的 REST 与响应映射
