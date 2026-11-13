@@ -187,6 +187,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `WEB_FETCH_ALL_PROVIDERS_FAILED` | 所有抓取后端都失败 |
 | `WEB_FETCH_BUDGET_EXHAUSTED` | 预算耗尽，没有任何后端跑完 |
 | `WEB_INVALID_URL` | URL 非法、超长、非 http(s)、带内嵌凭据 |
+| `WEB_INVALID_QUERY` | 搜索 query 为空或全是空白 |
 | `WEB_ABORTED` | 调用方取消 |
 
 ## 回滚

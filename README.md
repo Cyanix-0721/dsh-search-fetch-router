@@ -214,6 +214,7 @@ Failures carry a stable `code`, surfaced in the tool's structured error metadata
 | `WEB_FETCH_ALL_PROVIDERS_FAILED` | every fetch backend failed |
 | `WEB_FETCH_BUDGET_EXHAUSTED` | the budget ran out before any backend finished |
 | `WEB_INVALID_URL` | bad, over-long, non-http(s), or credential-bearing URL |
+| `WEB_INVALID_QUERY` | empty or blank search query |
 | `WEB_ABORTED` | the caller cancelled |
 
 ## Rolling back

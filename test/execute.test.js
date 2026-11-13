@@ -194,6 +194,49 @@ test('fetch: an invalid URL is rejected before any network call', async () => {
   }
 });
 
+test('fetch: a missing request object is rejected as an invalid URL, not a TypeError', async () => {
+  const stub = stubFetch(() => {
+    throw new Error('should not be reached');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({}));
+    await assert.rejects(
+      () => router.fetch(undefined, undefined),
+      (error) => {
+        assert.equal(error.code, 'WEB_INVALID_URL');
+        return true;
+      },
+    );
+    assert.equal(stub.calls.length, 0);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: a blank or missing query is rejected before any credit is spent', async () => {
+  const stub = stubFetch(() => {
+    throw new Error('should not be reached');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({}));
+    for (const bad of [{ query: '' }, { query: '   ' }, {}, undefined]) {
+      // eslint-disable-next-line no-await-in-loop
+      await assert.rejects(
+        () => router.search(bad, undefined),
+        (error) => {
+          assert.equal(error.code, 'WEB_INVALID_QUERY');
+          return true;
+        },
+      );
+    }
+    assert.equal(stub.calls.length, 0, 'a blank query must never reach the network');
+  } finally {
+    stub.restore();
+  }
+});
+
 test('fetch: an already-aborted signal never reaches the network', async () => {
   const stub = stubFetch(() => {
     throw new Error('should not be reached');

@@ -21,6 +21,13 @@
   此前写死默认，用户无法按需在「覆盖面」与「成本」之间取舍。非法值按 `basic` 处理。
 - `tavilyTopic` 配置项：Tavily `/search` 的主题，可选 `general` / `news` / `finance`，
   默认 `general`。查时效性内容时用 `news` 更准。非法值按 `general` 处理。
+
+- 搜索入参早期校验：空、全空白或非字符串的 query 在 provider 边界直接抛
+  `WEB_INVALID_QUERY`，不再打一次上游、白烧一次额度换一个 400。抓取侧 `request` 整体缺失
+  也归为 `WEB_INVALID_URL`，而不是裸 `TypeError`。（宿主工具层通常已挡空 query，这里是
+  直接调用 `ctx.web.search` 时的第二道闸。）
+- 「API 密钥」卡片在每个供应商标题旁标出它服务哪几条链（`搜索 · 抓取`），悬停有说明——
+  停用一家时能一眼看出它影响搜索、抓取还是两条都影响。
 ### Changed
 
 - 凭据解析改为并行：每个 key 池内部并行解析、各后端之间也并行准备，不再把 N 把 key 的

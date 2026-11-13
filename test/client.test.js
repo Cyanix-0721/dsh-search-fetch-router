@@ -523,3 +523,29 @@ test('orderFor: 默认顺序与供应商表一致，且不含无 key 的兜底',
   assert.ok(!DEFAULT_ORDER.includes('deepseek-official'));
   assert.ok(!DEFAULT_ORDER.includes('http'));
 });
+
+/** Every string rendered anywhere in the tree (text nodes included). */
+function collectText(node, out = []) {
+  if (node == null) return out;
+  if (typeof node === 'string') { out.push(node); return out; }
+  if (Array.isArray(node)) { for (const child of node) collectText(child, out); return out; }
+  if (typeof node === 'object') {
+    collectText(node.children, out);
+    collectText(node.props?.children, out);
+  }
+  return out;
+}
+
+test('client: every provider shows which chains it serves', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations } = fakeContext();
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({
+    subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } },
+  });
+  const tree = element.type(element.props);
+  const badges = collectText(tree).filter((text) => text === 'Search · Fetch');
+  assert.equal(badges.length, 3, 'all three built-in providers serve both chains');
+});
