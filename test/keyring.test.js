@@ -143,3 +143,52 @@ test('ring: an absurd Retry-After is capped at a day', async () => {
   keyring.penalize('A', { status: 429, message: 'slow down', retryAfterMs: 30 * 24 * 60 * 60 * 1000 }, 0);
   assert.equal(keyring.cooldowns.get('A'), 24 * 60 * 60 * 1000);
 });
+
+test('ring: a timeout cools the key briefly, not for the whole cycle', async () => {
+  // 超时是「这次慢」，不是「这把 key 坏了」。按默认冷却整把 key，单 key 用户会因一次
+  // 慢请求让唯一一把 key 停摆一整个冷却周期。
+  const slow = ring(['A'], async () => 'v', { cooldownMs: 60_000 });
+  slow.penalize('A', { message: 'request timed out' }, 0);
+  assert.equal(slow.cooldowns.get('A'), 12_000);
+  assert.deepEqual(slow.candidates(11_000), []);
+  assert.deepEqual(slow.candidates(12_000), ['A']);
+});
+
+test('ring: a TimeoutError from AbortSignal.timeout also cools briefly', async () => {
+  const keyring = ring(['A'], async () => 'v', { cooldownMs: 60_000 });
+  const error = new Error('The operation was aborted due to timeout');
+  error.name = 'TimeoutError';
+  keyring.penalize('A', error, 0);
+  assert.equal(keyring.cooldowns.get('A'), 12_000);
+});
+
+test('ring: a timeout never cools longer than its own short window, even with Retry-After', async () => {
+  const keyring = ring(['A'], async () => 'v', { cooldownMs: 60_000 });
+  keyring.penalize('A', { message: 'timed out', retryAfterMs: 3_600_000 }, 0);
+  assert.equal(keyring.cooldowns.get('A'), 12_000);
+});
+
+test('ring: a 504 counts as a timeout, a 500 does not', async () => {
+  const gateway = ring(['A'], async () => 'v', { cooldownMs: 60_000 });
+  gateway.penalize('A', { status: 504, message: 'gateway timeout' }, 0);
+  assert.equal(gateway.cooldowns.get('A'), 12_000);
+
+  const server = ring(['A'], async () => 'v', { cooldownMs: 60_000 });
+  server.penalize('A', { status: 500, message: 'boom' }, 0);
+  assert.equal(server.cooldowns.get('A'), 60_000);
+});
+
+test('ring: concurrent requests claim different starting points', async () => {
+  // 共用游标会让并发请求都从第一把 key 开始，多 key 池在并发下退化成单 key。
+  const keyring = ring(['A', 'B', 'C'], async () => 'v');
+  const starts = [keyring.claim(), keyring.claim(), keyring.claim()];
+  assert.deepEqual(starts, [0, 1, 2]);
+  assert.equal(keyring.claim(), 0);
+  assert.deepEqual(keyring.candidates(0, starts[1]), ['B', 'C', 'A']);
+});
+
+test('ring: claim on an empty ring is inert', async () => {
+  const keyring = ring([], async () => 'v');
+  assert.equal(keyring.claim(), 0);
+  assert.deepEqual(keyring.candidates(0, 0), []);
+});

@@ -898,3 +898,49 @@ test('search: an explicitly emptied providerOrder is not resurrected by the lega
   await assert.rejects(() => router.search({ query: 'q' }, undefined), /no web search provider is usable/);
   assert.deepEqual(calls, [], 'a disabled provider must not be used');
 });
+
+test('fetch: a Firecrawl 200 without data does not cool down the whole key pool', async () => {
+  // 上游 200 但响应体缺 data 是**请求级**异常（反爬拦截等）。若抛错，执行层的 keyed
+  // catch 会把它当成「这把 key 坏了」，一次软错误就让该供应商整个冷却周期不可用。
+  let calls = 0;
+  const stub = stubFetch((url) => {
+    calls += 1;
+    if (url.includes('firecrawl.dev')) return Response.json({ success: false, error: 'blocked by anti-bot' });
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ F1: 'a', F2: 'b' }) });
+    const router = createRouter(
+      ctx,
+      configWith({ providerOrder: ['firecrawl'], firecrawlApiKeyRefs: ['F1', 'F2'] }),
+    );
+    await assert.rejects(() => router.fetch({ url: 'https://example.com/a' }, undefined), /no page data|empty body/);
+    const afterFirst = calls;
+    assert.equal(afterFirst, 1, '缺 data 时不该在同一次调用里试第二把 key（与 key 无关）');
+    await assert.rejects(() => router.fetch({ url: 'https://example.com/a' }, undefined), /no page data|empty body/);
+    assert.equal(calls, afterFirst + 1, '两把 key 都必须仍可用：第二轮要能再次触网');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: concurrent requests spread across the key pool', async () => {
+  // 共用游标会让并发请求都从第一把 key 开始，多 key 池在并发下退化成单 key。
+  const used = [];
+  const stub = stubFetch(async (url, init) => {
+    used.push(init.headers.authorization.replace('Bearer ', ''));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return Response.json({ results: [{ url: 'https://a.example.com' }] });
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ K1: 'K1', K2: 'K2', K3: 'K3' }) });
+    const router = createRouter(
+      ctx,
+      configWith({ tavilyApiKeyRefs: ['K1', 'K2', 'K3'], searchFallback: false }),
+    );
+    await Promise.all([1, 2, 3].map(() => router.search({ query: 'q' }, undefined)));
+    assert.equal(new Set(used).size, 3, `三个并发请求应各用一把 key，实际：${used.join(', ')}`);
+  } finally {
+    stub.restore();
+  }
+});

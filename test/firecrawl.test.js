@@ -47,8 +47,20 @@ test('map: markdown becomes a text body', () => {
   assert.equal(result.statusCode, 200);
 });
 
-test('map: missing data throws', () => {
-  assert.throws(() => mapScrapeResponse({}, 'https://example.com', { maxBodyChars: 10 }), /response\.data is missing/);
+test('map: missing data is reported as a request-level failure, not thrown', () => {
+  // 抛错会被执行层的 keyed catch 当成「这把 key 坏了」，一次上游软错误就把整池 key
+  // 打进冷却。缺 data 是请求级异常，必须走 unusable 分支。
+  const mapped = mapScrapeResponse({ success: false, error: 'blocked by anti-bot' }, 'https://example.com', {
+    maxBodyChars: 10,
+  });
+  assert.equal(mapped.missing, true);
+  assert.match(mapped.failure, /blocked by anti-bot/);
+});
+
+test('map: missing data without an upstream reason still names what is missing', () => {
+  const mapped = mapScrapeResponse({}, 'https://example.com', { maxBodyChars: 10 });
+  assert.equal(mapped.missing, true);
+  assert.match(mapped.failure, /response\.data is missing/);
 });
 
 test('map: over-long bodies are truncated', () => {
