@@ -126,3 +126,30 @@ test('search registry: an official endpoint that does not parse marks the entry 
   };
   assert.equal(SEARCH_BACKENDS['deepseek-official'].isAvailable(broken), false);
 });
+
+test('search registry: the tavily entry reads search depth and topic from config', async () => {
+  const original = globalThis.fetch;
+  const bodies = [];
+  globalThis.fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return Response.json({ results: [] });
+  };
+  try {
+    const read = (key) => {
+      if (key === 'tavilySearchDepth') return 'advanced';
+      if (key === 'tavilyTopic') return 'news';
+      return undefined;
+    };
+    await SEARCH_BACKENDS.tavily.run({
+      apiKey: 'tk',
+      request: { query: 'q' },
+      signal: undefined,
+      timeoutMs: 1_000,
+      read,
+    });
+    assert.equal(bodies[0].search_depth, 'advanced');
+    assert.equal(bodies[0].topic, 'news');
+  } finally {
+    globalThis.fetch = original;
+  }
+});

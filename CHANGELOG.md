@@ -16,6 +16,11 @@
   处理，不会把未知档位发给上游（上游对未知 `type` 返回 400，会让整次搜索失败）。
 - 执行层把 `read` 传给搜索后端，后端可从配置读自己的调参项，不必为每个参数加一条
   `if (backend === ...)` 分支。
+- `tavilySearchDepth` 配置项：Tavily `/search` 的搜索深度，可选 `basic` / `fast` /
+  `ultra-fast`（更快更省，1 credit）或 `advanced`（更深更全，2 credits），默认 `basic`。
+  此前写死默认，用户无法按需在「覆盖面」与「成本」之间取舍。非法值按 `basic` 处理。
+- `tavilyTopic` 配置项：Tavily `/search` 的主题，可选 `general` / `news` / `finance`，
+  默认 `general`。查时效性内容时用 `news` 更准。非法值按 `general` 处理。
 ### Changed
 
 - 凭据解析改为并行：每个 key 池内部并行解析、各后端之间也并行准备，不再把 N 把 key 的

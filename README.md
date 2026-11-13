@@ -36,6 +36,8 @@ job. Use the firecrawl MCP tools for that.
 Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each provider gets
 `min(its own timeout, whatever is left)`; when less than 2 s remains, no new provider starts.
 
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full mental model (one `providerOrder`, two chains) and the invariants the code must keep.
+
 ## Adding a search provider
 
 Search backends are **declaratively registered** — the execution layer has no per-provider
@@ -180,6 +182,8 @@ live.
 | `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key reference names (enabled by default; a set key joins the chain, disable in the card) |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key reference names |
 | `tavilyExtractDepth` | `basic` | `basic` or `advanced` |
+| `tavilySearchDepth` | `basic` | `basic` / `fast` / `ultra-fast` (1 credit) or `advanced` (2 credits) |
+| `tavilyTopic` | `general` | `general` / `news` / `finance` |
 | `minContentChars` | `0` | escalate below this length; `0` means only emptiness counts |
 | `totalBudgetMs` | `45000` | hard cap for one fetch |
 | `tavilyTimeoutMs` | `15000` | per-segment timeout |

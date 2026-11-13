@@ -28,6 +28,8 @@
 每次抓取跑在一个硬预算下（`totalBudgetMs`，默认 45 秒）。每段拿
 `min(自己的超时, 剩余预算)`；剩余不足 2 秒就不再开新段。
 
+完整心智模型（一张 `providerOrder` 驱动两条链）与必须守住的不变量见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
 ## 新增搜索供应商
 
 搜索后端是**声明式注册**的，执行层没有任何针对具体供应商的分支。要加一个供应商，只动三处：
@@ -153,6 +155,8 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key 引用名（默认已启用；填了 key 就进链，可在插件页停用） |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key 引用名 |
 | `tavilyExtractDepth` | `basic` | `basic` 或 `advanced` |
+| `tavilySearchDepth` | `basic` | `basic` / `fast` / `ultra-fast`（1 credit）或 `advanced`（2 credits） |
+| `tavilyTopic` | `general` | `general` / `news` / `finance` |
 | `minContentChars` | `0` | 短于此长度就升级；`0` 表示只判空 |
 | `totalBudgetMs` | `45000` | 单次抓取硬上限 |
 | `tavilyTimeoutMs` | `15000` | 单段超时 |

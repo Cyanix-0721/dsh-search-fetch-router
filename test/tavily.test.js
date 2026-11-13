@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { extractTavily, normalizeExtractDepth, searchTavily } from '../lib/tavily.js';
+import { extractTavily, normalizeExtractDepth, normalizeSearchDepth, normalizeTopic, searchTavily } from '../lib/tavily.js';
 
 /**
  * 用一个假的 `fetch` 替换全局，记录调用参数并回放给定响应。
@@ -237,4 +237,41 @@ test('tavily: normalizeExtractDepth only ever yields basic or advanced', () => {
   assert.equal(normalizeExtractDepth(''), 'basic');
   assert.equal(normalizeExtractDepth(undefined), 'basic');
   assert.equal(normalizeExtractDepth(42), 'basic');
+});
+
+test('search: depth and topic are passed through and normalised', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    await searchTavily({ apiKey: 'k', query: 'q', signal: undefined, timeoutMs: 1_000, depth: 'advanced', topic: 'news' });
+    const body = JSON.parse(stub.calls[0].init.body);
+    assert.equal(body.search_depth, 'advanced');
+    assert.equal(body.topic, 'news');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: an unknown depth/topic falls back to the official defaults', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    await searchTavily({ apiKey: 'k', query: 'q', signal: undefined, timeoutMs: 1_000, depth: 'nonsense', topic: 'nonsense' });
+    const body = JSON.parse(stub.calls[0].init.body);
+    assert.equal(body.search_depth, 'basic');
+    assert.equal(body.topic, 'general');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('normalizeSearchDepth / normalizeTopic: trim, lower-case, whitelist', () => {
+  assert.equal(normalizeSearchDepth('  Advanced '), 'advanced');
+  assert.equal(normalizeSearchDepth('ultra-fast'), 'ultra-fast');
+  assert.equal(normalizeSearchDepth('fast'), 'fast');
+  assert.equal(normalizeSearchDepth('weird'), 'basic');
+  assert.equal(normalizeSearchDepth(42), 'basic');
+  assert.equal(normalizeSearchDepth(undefined), 'basic');
+  assert.equal(normalizeTopic(' News '), 'news');
+  assert.equal(normalizeTopic('FINANCE'), 'finance');
+  assert.equal(normalizeTopic('sports'), 'general');
+  assert.equal(normalizeTopic(null), 'general');
 });
