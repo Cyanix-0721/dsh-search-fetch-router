@@ -168,7 +168,7 @@ test('fetch: no configured key and fallback off is a clear failure, not a silent
     () => router.fetch({ url: 'https://example.com/a' }, undefined),
     (error) => {
       assert.equal(error.code, 'WEB_FETCH_ALL_PROVIDERS_FAILED');
-      assert.match(error.message, /no Tavily or Firecrawl key reference is configured/);
+      assert.match(error.message, /no configured key reference resolved for any provider/);
       return true;
     },
   );
