@@ -171,7 +171,6 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | 供应商启用顺序，**搜索与抓取共用**；没配 key 的运行时跳过。插件页的排序/停用改的就是它。兜底是官方 `deepseek-official`（搜索）与本地 `http`（抓取） |
 | `keyNotes` | `{}` | 每把 key 的本机备注（ref→一句话），只展示不参与请求 |
 | `verboseLog` | `false` | 打开后把「这次由哪个后端服务」从 `debug` 升到 `info`，普通日志级别就能看见 |
-| `searchProviderOrder` | 未设置 | **旧字段，仅用于升级迁移**。`providerOrder` 仍是默认值而此字段有值时沿用它的顺序；一旦在 `providerOrder` 里改过（含清空）就以新字段为准。不进设置表单，日常不用管 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |

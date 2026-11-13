@@ -37,11 +37,6 @@
 
 ## 已知限制
 
-- **顺序迁移的边界**：`resolveProviderOrder` 靠「值是否等于默认」判断用户有没有改过新字段。
-  实测 schemastery 的 Config 实例不保留「是否显式设置过」——`Config({})` 与
-  `Config({providerOrder: DEFAULT_PROVIDER_ORDER})` 的 own property / symbol / meta 完全一致。
-  因此「先改过顺序、又改回默认三项」时旧字段 `searchProviderOrder` 会接管。概率低、后果小
-  （卡片里再改一次即可），不值得为此加更复杂的探测。
 - **`unusable` 即 break**：抓取 keyed 循环遇到 `unusable` 就不再试同后端其余 key。这是有意的
   假设——`unusable` 与用哪把 key 无关。若将来某后端的「不可用」其实是 per-key 的（按 key 的
   套餐限制抓取域名），必须把它改成抛错，否则会误弃整个后端。代码里已有注释。

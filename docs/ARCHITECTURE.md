@@ -39,8 +39,7 @@
 0. **入参校验（触网前）**：空/全空白 query 抛 `WEB_INVALID_QUERY`；fetch 的 url 非法或
    `request` 整体缺失抛 `WEB_INVALID_URL`。宿主工具层通常已先挡一遍，这里是 provider 边界
    上对「直接调 `ctx.web.search`」的调用方的第二道闸——不白烧一次上游额度。
-1. **读顺序**：`resolveProviderOrder(config)` —— 新字段 `providerOrder` 为准；只有它仍是默认值
-   时才让旧字段 `searchProviderOrder` 接管（一次性迁移）。
+1. **读顺序**：`resolveProviderOrder(config)` —— 直接读 `providerOrder`（搜索与抓取唯一一份）。
    随后 `warnUnknownProviders()` 把表里未注册的 id 打一行 `warn` 后跳过（正常 UI 产生不了，
    只有手改配置才会；不硬报错是因为 Config 抛错会连累两条被 pin 的链一起挂）。
    搜索还会用 `withMaxResults()` 把结果条数夹到 `maxSearchResults` 上限后再下发。

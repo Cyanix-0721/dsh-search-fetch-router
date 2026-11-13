@@ -681,42 +681,6 @@ test('search: an exhausted total budget yields WEB_SEARCH_BUDGET_EXHAUSTED', asy
 
 
 
-test('search: legacy searchProviderOrder bridges in when providerOrder is at its default', async () => {
-  const calls = [];
-  const fakeBackend = {
-    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
-    async run({ apiKey, request }) { calls.push({ apiKey, q: request.query }); return { sources: [{ url: 'https://fake.example/legacy' }], truncated: false }; },
-  };
-  const config = {
-    providerOrder: ['tavily', 'exa', 'firecrawl'], // 等于默认值
-    searchProviderOrder: ['fake'], // 旧字段，迁移应生效
-    fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false,
-  };
-  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
-  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
-  const result = await router.search({ query: 'q' }, undefined);
-  assert.equal(result.sources[0].url, 'https://fake.example/legacy');
-  assert.equal(calls.length, 1);
-});
-
-test('search: a non-default providerOrder overrides the legacy field', async () => {
-  const calls = [];
-  const fakeBackend = {
-    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
-    async run({ apiKey, request }) { calls.push({ apiKey, q: request.query }); return { sources: [{ url: 'https://fake.example/order' }], truncated: false }; },
-  };
-  const config = {
-    providerOrder: ['fake'], // 非默认 → 以新字段为准
-    searchProviderOrder: ['ghost'],
-    fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false,
-  };
-  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
-  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
-  const result = await router.search({ query: 'q' }, undefined);
-  assert.equal(result.sources[0].url, 'https://fake.example/order');
-  assert.equal(calls.length, 1);
-});
-
 test('search: verboseLog routes the served-by note to info instead of debug', async () => {
   const infoLines = [];
   const debugLines = [];
@@ -920,28 +884,6 @@ test('fetch: a keyless backend reporting unusable hands over instead of returnin
   const router = createRouter(ctx, config, { fetchBackends: { emptykeyless: empty, goodkeyless: good } });
   const result = await router.fetch({ url: 'https://fake.example/k' }, undefined);
   assert.equal(result.body.content, 'fallback body');
-});
-
-test('search: an explicitly emptied providerOrder is not resurrected by the legacy field', async () => {
-  // schema 默认值是三项，所以空数组只可能来自用户把供应商全部停用。
-  // 此时旧字段不能把它救回来——否则「全部停用」重启后又变成旧顺序。
-  const config = {
-    providerOrder: [], // 用户全部停用
-    searchProviderOrder: ['fake'], // 旧字段仍有值
-    fakeApiKeyRefs: ['FAKE_KEY'],
-    fakeTimeoutMs: 5_000,
-    cooldownMs: 60_000,
-    searchFallback: false,
-  };
-  const calls = [];
-  const fakeBackend = {
-    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
-    async run() { calls.push('fake'); return { sources: [{ url: 'https://fake.example/x' }], truncated: false }; },
-  };
-  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
-  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
-  await assert.rejects(() => router.search({ query: 'q' }, undefined), /no web search provider is usable/);
-  assert.deepEqual(calls, [], 'a disabled provider must not be used');
 });
 
 test('fetch: a Firecrawl 200 without data does not cool down the whole key pool', async () => {
