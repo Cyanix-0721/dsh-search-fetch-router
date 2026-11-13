@@ -245,17 +245,35 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 169 tests.
+`node --test`, no framework, no build step. 210 tests.
 
 - `test/router.test.js` — data-driven search chain order (`providerOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.
   Pure functions, no stubs.
-- `test/urls.test.js` — glob semantics (`*` vs `**`), match surface, URL validation.
-- `test/keyring.test.js` — rotation, cooldown expiry, permanent death, unresolvable refs.
-- `test/firecrawl.test.js` — request body, response mapping, `metadata.statusCode` fallback.
-- `test/tavily.test.js` — request shape, source mapping, the HTTP-200-is-not-success case.
-- `test/fetch-backends.test.js` — registry shape: its keys match `router.FETCH_BACKENDS`, the
-  keyed vs keyless field split, and `lookupFetchBackend` for known/unknown ids.
+- `test/urls.test.js` — URL validation: length, scheme, embedded credentials, and inputs the
+  parser itself rejects (they must still come back as `WEB_INVALID_URL`, not a bare `TypeError`).
+- `test/keyring.test.js` — rotation, concurrent claiming, cooldown tiers (rate limit, quota,
+  timeout), permanent death, unresolvable refs.
+- `test/firecrawl.test.js` — scrape body knobs, response mapping, `metadata.statusCode`
+  fallback, upstream failure reasons, and `/v2/search` mapping (highlights, bare-array `data`).
+- `test/exa.test.js` — `/search` mapping and search-type normalisation, `/contents` failure
+  tags matched by URL rather than position.
+- `test/tavily.test.js` — request shape, source mapping, the HTTP-200-is-not-success case,
+  server-side timeout and `max_results` clamping.
+- `test/rest.test.js` — the shared POST layer: status and `Retry-After` extraction, non-JSON
+  bodies, cause preservation, and caller cancellation passing through unwrapped.
+- `test/errors.test.js` — `asWebError` never nests an existing `WebError` (its `code` is the
+  external contract) and `isAbortError` recognises all three cancellation shapes.
+- `test/search-backends.test.js` — registry shape and the official entry's availability
+  semantics (a broken endpoint is skipped; a settings read failure is not).
+- `test/fetch-backends.test.js` — registry shape, keyed vs keyless split, and the Exa adapter's
+  mapping including the empty-body `unusable` path.
+- `test/client.test.js` — the browser bundle contract: slot guard, key groups, and the pure
+  ordering helpers (toggle, move-before, swap, merge).
+- `test/docs.test.js` — both READMEs document exactly the config fields that exist, and every
+  error code in `CODES`.
+- `test/index.test.js` — assembly constraints: `available()` is always true, a failing fetch
+  registration leaves search intact, teardown unregisters both.
 - `test/execute.test.js` — degradation: Tavily down → Firecrawl; bad key rolls to the next;
   all down names every backend; no-key-configured is actionable; invalid URL never reaches
   the network; aborted signal never reaches the network; budget exhaustion is distinguished
