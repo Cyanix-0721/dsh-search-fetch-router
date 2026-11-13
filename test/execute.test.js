@@ -944,3 +944,41 @@ test('search: concurrent requests spread across the key pool', async () => {
     stub.restore();
   }
 });
+
+test('search: a 200 error body degrades to the next backend instead of returning zero results', async () => {
+  // 上游 200 但响应体是错误时，若当成「零结果」，用户拿到空结果、链也不降级，故障被静默吞掉。
+  const stub = stubFetch((url) => {
+    if (url.includes('api.tavily.com')) return Response.json({ error: 'quota exceeded for this key' });
+    if (url.includes('api.exa.ai')) return Response.json({ results: [{ url: 'https://exa.example' }] });
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 't', EXA_API_KEY: 'e' }) });
+    const router = createRouter(ctx, configWith({ providerOrder: ['tavily', 'exa'] }));
+    const result = await router.search({ query: 'q' }, undefined);
+    assert.equal(result.sources[0].url, 'https://exa.example');
+    assert.equal(stub.calls.length, 2);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: a 200 error body does not cool down the key, because the key is not at fault', async () => {
+  const stub = stubFetch((url) => {
+    if (url.includes('api.tavily.com')) return Response.json({ error: 'upstream hiccup' });
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ T1: 'a', T2: 'b' }) });
+    const router = createRouter(
+      ctx,
+      configWith({ tavilyApiKeyRefs: ['T1', 'T2'], searchFallback: false }),
+    );
+    await assert.rejects(() => router.search({ query: 'q' }, undefined), /upstream hiccup/);
+    const afterFirst = stub.calls.length;
+    await assert.rejects(() => router.search({ query: 'q' }, undefined), /upstream hiccup/);
+    assert.ok(stub.calls.length > afterFirst, '两把 key 都不该被冷却：第二轮仍要能触网');
+  } finally {
+    stub.restore();
+  }
+});

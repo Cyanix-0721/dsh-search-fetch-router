@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { USER_AGENT, postJson } from '../lib/rest.js';
+import { errorPayload, requestFailure, USER_AGENT, postJson } from '../lib/rest.js';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
@@ -94,4 +94,43 @@ test('postJson 调用方取消时原样抛中止错误，不包装成 HTTP 失�
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('errorPayload: a bare error body is recognised', () => {
+  // 上游用 4xx/5xx 报错是常态，但都出现过 200 + 错误体（Firecrawl 的 {success:false} 尤甚）。
+  // 不认出来的话，「上游出错」和「确实零结果」在调用方看来一模一样。
+  assert.equal(errorPayload({ success: false, error: 'blocked' }, ['data']), 'blocked');
+  assert.equal(errorPayload({ error: 'quota exceeded' }, ['results']), 'quota exceeded');
+  assert.equal(errorPayload({ detail: 'bad query' }, ['results']), 'bad query');
+  assert.equal(errorPayload({ error: { message: 'nested reason' } }, ['results']), 'nested reason');
+  assert.equal(errorPayload({ errors: [{ message: 'first failure' }] }, ['results']), 'first failure');
+});
+
+test('errorPayload: success:false without a reason still names the shape', () => {
+  assert.equal(errorPayload({ success: false }, ['data']), 'upstream reported success: false');
+});
+
+test('errorPayload: a legitimate empty result set is NOT an error', () => {
+  // 这是最关键的一条：空结果必须仍是「零结果」，不能因为「看起来空」就降级。
+  assert.equal(errorPayload({ results: [] }, ['results']), undefined);
+  assert.equal(errorPayload({ data: { web: [] } }, ['data']), undefined);
+  assert.equal(errorPayload({ results: [], answer: '' }, ['results']), undefined);
+});
+
+test('errorPayload: a payload carrying both results and an error is treated as results', () => {
+  // 有结果字段就以结果为准：部分失败不该让整次搜索降级。
+  assert.equal(errorPayload({ results: [{ url: 'https://a' }], error: 'partial' }, ['results']), undefined);
+});
+
+test('errorPayload: non-object payloads are not errors', () => {
+  assert.equal(errorPayload(undefined, ['results']), undefined);
+  assert.equal(errorPayload(null, ['results']), undefined);
+  assert.equal(errorPayload([1, 2], ['results']), undefined);
+  assert.equal(errorPayload('text', ['results']), undefined);
+});
+
+test('requestFailure: marked request-level so the key pool leaves the key alone', () => {
+  const failure = requestFailure('Demo /x', 'blocked');
+  assert.equal(failure.requestLevel, true);
+  assert.match(failure.message, /Demo \/x reported an error: blocked/);
 });
