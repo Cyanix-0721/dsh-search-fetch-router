@@ -291,10 +291,10 @@ test('client: a busy field disables the input and the save button', () => {
   assert.equal(saveButtons[0].props.disabled, true, 'save stays disabled while busy');
 });
 
-/** Every "Add account" button (one per group). */
+/** Every "add another key" button (one per group). */
 function collectAddButtons(tree) {
   return flatten(tree).filter(
-    (node) => node.type === 'button' && Array.isArray(node.children) && node.children.includes('Add account'),
+    (node) => node.type === 'button' && node.props?.['data-sfr-add'] !== undefined,
   );
 }
 
