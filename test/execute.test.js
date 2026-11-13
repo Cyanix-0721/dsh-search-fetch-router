@@ -646,6 +646,14 @@ test('search: verboseLog routes the served-by note to info instead of debug', as
   assert.equal(debugLines.length, 0);
 });
 
+// 注意：这条用例走的是宿主**真正的** HttpFetchProvider（lib/official.js 的
+// createOfficialFetchProvider），它内部用 `const { fetch } = await import("undici")`
+// 发请求（见 @deepseek-ai/dsh-web-fetch-http/lib/index.js:257）。undici 是宿主包的
+// 运行时依赖（其 package.json dependencies 里写着 undici 8.11.2），**不是本插件的依赖**，
+// 本仓库顶层也解析不到（`import.meta.resolve("undici")` 会 ERR_MODULE_NOT_FOUND）；
+// 它能被解析，是因为我们加载了宿主实现。CI 的「Install host packages」步骤装
+// @deepseek-ai/dsh-web-fetch-http@next 时会一并带入 undici，故 CI 可跑。
+// 所以这是一条「依赖宿主实现」的集成测试，动机是覆盖 fetch 兜底的真实成功路径。
 test('fetch: local http fallback returns a successful result when no provider has a key', async () => {
   const server = createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
