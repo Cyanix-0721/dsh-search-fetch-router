@@ -96,17 +96,33 @@ test('search registry: the official entry is available only when its provider sa
   assert.equal(typeof verdict, 'boolean');
 });
 
-test('search registry: the official entry stays available even when ctx services explode', () => {
+test('search registry: reading settings blowing up does not make the official entry unavailable', () => {
   const hostile = {
     get() {
       throw new Error('service exploded');
     },
   };
   // 官方 provider 的 available() 是「有 apiKey / 有 resolveApiKey / 有 account token」三者取或，
-  // 而我们**总是**提供 resolveApiKey，所以它恒为 true——订阅账号不用填 key 也能走官方搜索。
-  // 因此「官方兜底永远在链尾」是设计语义，不是漏判：真没配好时它会在 search() 里失败，
-  // 错误汇总里多一条 `deepseek-official: ...`，比静默少一个后端更有信息量。
-  // 这里同时锁住「读 settings/credentials 抛错也不上抛」——上抛会变成一次假的搜索失败。
+  // 而我们**总是**提供 resolveApiKey，所以没配置时它仍为 true——订阅账号不用填 key 也能走官方
+  // 搜索，这是设计语义。读 settings/credentials 抛错也只该退回默认值，不该变成「不可用」：
+  // 那会让官方兜底凭空消失，而用户其实什么都没配错。
   assert.equal(SEARCH_BACKENDS['deepseek-official'].isAvailable(hostile), true);
   assert.equal(SEARCH_BACKENDS['deepseek-official'].isAvailable({}), true);
+});
+
+test('search registry: an official endpoint that does not parse marks the entry unavailable', () => {
+  // available() 除了凭据还要求 baseURL 能被解析、maxTokens/maxUses 是正整数。
+  // 用户在设置里把端点写坏时，跳过官方兜底比拿一个非法 URL 去发请求好——
+  // 后者会在 search() 里失败，白等一个段预算。
+  const broken = {
+    get(ns) {
+      if (ns !== 'settings') return undefined;
+      return {
+        describe: () => [
+          { ns: 'web-search-deepseek', value: { baseURL: 'not a url', maxTokens: 0 } },
+        ],
+      };
+    },
+  };
+  assert.equal(SEARCH_BACKENDS['deepseek-official'].isAvailable(broken), false);
 });
