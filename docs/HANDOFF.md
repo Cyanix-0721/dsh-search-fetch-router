@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 174 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 193 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
@@ -35,11 +35,24 @@
 新增供应商只加注册项与配置字段，`execute` / `router` 不动；要出现在密钥卡片，`client.js`
 的供应商列表加一项即可。详见设计文档「Adding a search provider / Adding a fetch provider」。
 
+## 已知限制
+
+- **顺序迁移的边界**：`resolveProviderOrder` 靠「值是否等于默认」判断用户有没有改过新字段。
+  实测 schemastery 的 Config 实例不保留「是否显式设置过」——`Config({})` 与
+  `Config({providerOrder: DEFAULT_PROVIDER_ORDER})` 的 own property / symbol / meta 完全一致。
+  因此「先改过顺序、又改回默认三项」时旧字段 `searchProviderOrder` 会接管。概率低、后果小
+  （卡片里再改一次即可），不值得为此加更复杂的探测。
+- **`unusable` 即 break**：抓取 keyed 循环遇到 `unusable` 就不再试同后端其余 key。这是有意的
+  假设——`unusable` 与用哪把 key 无关。若将来某后端的「不可用」其实是 per-key 的（按 key 的
+  套餐限制抓取域名），必须把它改成抛错，否则会误弃整个后端。代码里已有注释。
+- **跨域重定向**：宿主 `HttpFetchProvider` 只跟同源跳转，`lib/fetch-backends.js` 的
+  `fetchFollowingCrossOrigin` 最多追 3 跳、每跳仍走 `provider.fetch`（不绕过宿主 URL 校验）。
+
 ## 已验证 / 未验证
 
 **已验证**
 
-- `npm test` → 174 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 193 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
