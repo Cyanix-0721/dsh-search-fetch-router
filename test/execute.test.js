@@ -578,6 +578,53 @@ test('search: exa is used when listed in providerOrder', async () => {
   }
 });
 
+test('fetch: key rotation cannot spend more than the total budget', async () => {
+  // 与搜索同一条约束：段预算按 key 重算，不能让 N 把 key 各吃满一次段预算。
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const stub = stubFetch(async () => {
+    await sleep(700);
+    throw new TypeError('fetch failed');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ K1: 'a', K2: 'b', K3: 'c' }) });
+    const router = createRouter(ctx, configWith({
+      providerOrder: ['tavily'],
+      tavilyApiKeyRefs: ['K1', 'K2', 'K3'],
+      totalBudgetMs: 2_600,
+      tavilyTimeoutMs: 2_000,
+    }));
+    await assert.rejects(() => router.fetch({ url: 'https://example.com/a' }), () => true);
+    assert.equal(stub.calls.length, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: key rotation cannot spend more than the total budget', async () => {
+  // 段预算（tavilyTimeoutMs）是「每把 key 的上限」，不是整个后端共享的一份。
+  // 若循环里照抄外层的 budget，N 把 key 会各吃满一次段预算，总耗时变成 N×段预算，
+  // 总预算被彻底穿透：用户设了 2.6s，实际等了 2.1s 还在打第三把。
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const stub = stubFetch(async () => {
+    await sleep(700);
+    throw new TypeError('fetch failed');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ K1: 'a', K2: 'b', K3: 'c' }) });
+    const router = createRouter(ctx, configWith({
+      providerOrder: ['tavily'],
+      tavilyApiKeyRefs: ['K1', 'K2', 'K3'],
+      searchTotalBudgetMs: 2_600,
+      tavilyTimeoutMs: 2_000,
+    }));
+    await assert.rejects(() => router.search({ query: 'q' }), () => true);
+    // 第一把 700ms 后剩余 1.9s < MIN_SEGMENT_BUDGET_MS(2s)，必须就此收手。
+    assert.equal(stub.calls.length, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('search: an exhausted total budget yields WEB_SEARCH_BUDGET_EXHAUSTED', async () => {
   const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
   const router = createRouter(ctx, configWith({ searchTotalBudgetMs: 1 }));
