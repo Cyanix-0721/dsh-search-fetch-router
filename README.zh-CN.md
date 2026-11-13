@@ -129,7 +129,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 ## 设置
 
 调参字段由宿主自动生成表单渲染。此外本插件自带一个极小、**零构建**的浏览器 bundle
-（`lib/client.js`），在插件页加一张「API 密钥」卡片，用来填 Tavily / Brave / Firecrawl 的密钥。
+（`lib/client.js`），在插件页加一张「API 密钥」卡片，用来填 Tavily / Exa / Firecrawl 的密钥。
 卡片只经宿主的 `remote.credentials` 接口写入凭据库，不会把值存进任何配置文件。
 眼睛按钮可以显示你**正在输入、还没保存**的草稿；已保存的密钥不会回读。
 所有调参字段都是 `volatile`，改完即时生效。
@@ -137,19 +137,19 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | 字段 | 默认 | 含义 |
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key 引用名，按序尝试 |
-| `braveApiKeyRefs` | `["BRAVE_API_KEY"]` | Brave key 引用名（可选，需把 `brave` 填进 `searchProviderOrder`） |
+| `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key 引用名（可选，需把 `exa` 填进 `searchProviderOrder`） |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key 引用名 |
 | `tavilyExtractDepth` | `basic` | `basic` 或 `advanced` |
 | `minContentChars` | `0` | 短于此长度就升级；`0` 表示只判空 |
 | `totalBudgetMs` | `45000` | 单次抓取硬上限 |
 | `tavilyTimeoutMs` | `15000` | 单段超时 |
-| `braveTimeoutMs` | `15000` | Brave 单段超时 |
+| `exaTimeoutMs` | `15000` | Exa 单段超时 |
 | `firecrawlTimeoutMs` | `30000` | 单段超时 |
 | `httpTimeoutMs` | `10000` | 单段超时 |
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
-| `searchProviderOrder` | `["tavily"]` | 搜索供应商尝试顺序，按 id（内置 `tavily`、可选 `brave`）；官方 `deepseek-official` 作兜底 |
+| `searchProviderOrder` | `["tavily"]` | 搜索供应商尝试顺序，按 id（内置 `tavily`、可选 `exa`）；官方 `deepseek-official` 作兜底 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |

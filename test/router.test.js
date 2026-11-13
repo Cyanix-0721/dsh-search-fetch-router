@@ -35,10 +35,10 @@ test('search chain: nothing usable yields an empty chain', () => {
 });
 
 test('search chain: many providers keep order, dedupe, one official fallback at the end', () => {
-  const available = new Set(['tavily', 'brave', 'deepseek-official']);
+  const available = new Set(['tavily', 'exa', 'deepseek-official']);
   assert.deepEqual(
-    planSearchChain({ order: ['brave', 'tavily', 'brave'], isAvailable: (id) => available.has(id), fallback: true }),
-    ['brave', 'tavily', 'deepseek-official'],
+    planSearchChain({ order: ['exa', 'tavily', 'exa'], isAvailable: (id) => available.has(id), fallback: true }),
+    ['exa', 'tavily', 'deepseek-official'],
   );
 });
 

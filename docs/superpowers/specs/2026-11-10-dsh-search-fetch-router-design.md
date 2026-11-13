@@ -81,7 +81,7 @@ searchProviderOrder: [ tavily, … ] ──(all keys failed)──> deepseek-off
 rather than re-registering its settings namespace — that namespace belongs to the host and
 cannot be installed twice.
 
-Built-in search providers are `tavily` and `brave` (both keyed; `brave` is opt-in via
+Built-in search providers are `tavily` and `exa` (both keyed; `exa` is opt-in via
 `searchProviderOrder`), with `deepseek-official` as the keyless fallback.
 
 #### Adding a search provider

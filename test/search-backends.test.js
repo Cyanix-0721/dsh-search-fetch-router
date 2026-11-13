@@ -20,11 +20,11 @@ test('search registry: every entry is well-formed', () => {
   }
 });
 
-test('search registry: tavily and brave are keyed, official is keyless', () => {
+test('search registry: tavily and exa are keyed, official is keyless', () => {
   assert.equal(SEARCH_BACKENDS.tavily.keyRefsField, 'tavilyApiKeyRefs');
   assert.equal(SEARCH_BACKENDS.tavily.timeoutField, 'tavilyTimeoutMs');
-  assert.equal(SEARCH_BACKENDS.brave.keyRefsField, 'braveApiKeyRefs');
-  assert.equal(SEARCH_BACKENDS.brave.timeoutField, 'braveTimeoutMs');
+  assert.equal(SEARCH_BACKENDS.exa.keyRefsField, 'exaApiKeyRefs');
+  assert.equal(SEARCH_BACKENDS.exa.timeoutField, 'exaTimeoutMs');
   assert.equal(SEARCH_BACKENDS['deepseek-official'].keyRefsField, null);
   assert.equal(typeof SEARCH_BACKENDS['deepseek-official'].isAvailable, 'function');
 });
@@ -38,6 +38,6 @@ test('search registry: SEARCH_BACKEND_IDS covers every registry entry', () => {
 
 test('search registry: lookup returns the entry, or undefined for unknown ids', () => {
   assert.equal(lookupSearchBackend('tavily'), SEARCH_BACKENDS.tavily);
-  assert.equal(lookupSearchBackend('brave'), SEARCH_BACKENDS.brave);
+  assert.equal(lookupSearchBackend('exa'), SEARCH_BACKENDS.exa);
   assert.equal(lookupSearchBackend('nope'), undefined);
 });

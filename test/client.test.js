@@ -211,12 +211,12 @@ test('client: the card renders a field per configured reference', () => {
   const tree = element.type(element.props);
   assert.equal(tree.type, 'div');
   const children = tree.children.flat(Infinity).filter(Boolean);
-  // title, description, tavily group, firecrawl group, brave group, note
+  // title, description, tavily group, firecrawl group, exa group, note
   assert.equal(children.length, 6);
 
   const inputs = collectKeyInputs(tree);
   const labels = inputs.map((field) => field.props['data-sfr-key']).sort();
-  assert.deepEqual(labels, ['BRAVE_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
+  assert.deepEqual(labels, ['EXA_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
   // Nothing is being typed yet, so no field should be revealed and no eye button exists.
   assert.ok(inputs.every((field) => field.props.type === 'password'));
   // A group with more than one reference gets a per-row remove button; a single-row
@@ -239,7 +239,7 @@ test('client: falls back to the default reference names on a loading snapshot', 
   const inputs = collectKeyInputs(tree);
   assert.deepEqual(
     inputs.map((field) => field.props['data-sfr-key']).sort(),
-    ['BRAVE_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY'],
+    ['EXA_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY'],
   );
 });
 
@@ -338,10 +338,10 @@ test('client: the add button appends a reference name through form.mutate', asyn
     { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
   ]);
 
-  // The third target the brave array.
+  // The third target the exa array.
   await addButtons[2].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['braveApiKeyRefs', 1], value: 'BRAVE_API_KEY_2' },
+    { op: 'set', path: ['exaApiKeyRefs', 1], value: 'EXA_API_KEY_2' },
   ]);
 });
 

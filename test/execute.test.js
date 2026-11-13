@@ -556,21 +556,22 @@ test('search: debug log records which backend served the request', async () => {
   assert.ok(debugLines.some((line) => line.includes('served by fake')), debugLines.join('\n'));
 });
 
-test('search: brave is used when listed in searchProviderOrder', async () => {
+test('search: exa is used when listed in searchProviderOrder', async () => {
   const stub = stubFetch((url) => {
-    if (url.includes('api.search.brave.com')) {
-      return Response.json({ web: { results: [{ title: 'B', url: 'https://b.example', description: 'd' }] } });
+    if (url.includes('api.exa.ai')) {
+      return Response.json({ results: [{ title: 'E', url: 'https://e.example', text: 'snippet' }] });
     }
     throw new Error(`unexpected ${url}`);
   });
   try {
-    const ctx = fakeCtx({ credentials: fakeCredentials({ BRAVE_API_KEY: 'bk' }) });
-    const router = createRouter(ctx, configWith({ searchProviderOrder: ['brave'] }));
+    const ctx = fakeCtx({ credentials: fakeCredentials({ EXA_API_KEY: 'ek' }) });
+    const router = createRouter(ctx, configWith({ searchProviderOrder: ['exa'] }));
     const result = await router.search({ query: 'hello' }, undefined);
-    assert.equal(result.sources[0].url, 'https://b.example');
+    assert.equal(result.sources[0].url, 'https://e.example');
     assert.equal(stub.calls.length, 1);
-    assert.match(stub.calls[0].url, /api\.search\.brave\.com\/res\/v1\/web\/search/);
-    assert.equal(stub.calls[0].init.headers['x-subscription-token'], 'bk');
+    assert.match(stub.calls[0].url, /api\.exa\.ai\/search$/);
+    assert.equal(stub.calls[0].init.headers['x-api-key'], 'ek');
+    assert.equal(JSON.parse(stub.calls[0].init.body).query, 'hello');
   } finally {
     stub.restore();
   }
