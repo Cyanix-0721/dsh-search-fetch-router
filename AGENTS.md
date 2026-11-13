@@ -6,8 +6,7 @@
 
 一个 DSH（DeepSeek Harness）插件，接管 `ctx.web` 的搜索与抓取两条能力，路由顺序：
 
-- **搜索**：按 `searchProviderOrder`（默认 `tavily`、`exa`，没配 key 的运行时自动跳过；插件页卡片可排序/停用）→ 可回落 DSH 官方 `deepseek-official`（走 magpie 网关）
-- **抓取**：固定顺序 Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`
+- **搜索与抓取共用一张 `providerOrder`**（默认 `tavily`、`exa`、`firecrawl`，没配 key 的运行时自动跳过；插件页卡片可排序/停用/写备注）。搜索末尾可回落 DSH 官方 `deepseek-official`（走 magpie 网关）；抓取末尾可回落本地 `http`
 
 高级抓取（整站爬、反爬、结构化抽取）不归本插件管，交给 firecrawl MCP。
 
@@ -57,8 +56,8 @@ lib/fetch-backends.js 声明式抓取后端注册表：只做单 URL 基础抓�
 lib/urls.js           URL 校验（长度 / 协议 / 内嵌凭据）
 lib/keyring.js        refs 池：轮转 / 冷却 / 永久失效
 lib/tavily.js         /search 与 /extract 的 REST
-lib/exa.js            /search 的 REST（可选语义搜索供应商）
-lib/firecrawl.js      /v2/scrape 的 REST 与响应映射
+lib/exa.js            /search 与 /contents 的 REST
+lib/firecrawl.js      /v2/scrape 与 /v2/search 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
 lib/execute.js        执行层：把决策落到调用上，失败降级
@@ -82,10 +81,10 @@ node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-
 - **决策与执行分开。** 新逻辑先问「这是纯决策吗」——是就进 `lib/router.js`，那里可以
   零成本测完所有分支。
 - **新增搜索供应商走注册表，不加 if 分支。** 在 `lib/search-backends.js` 的 `SEARCH_BACKENDS`
-  加一项 + `lib/config.js` 加字段 + 用户把 id 填进 `searchProviderOrder`；
+  加一项 + `lib/config.js` 加字段 + 用户把 id 填进 `providerOrder`；
   `lib/execute.js` 与 `lib/router.js` 保持数据驱动，不写 `if (backend === ...)`。
-- **新增抓取供应商同理走 `lib/fetch-backends.js`。** 抓取链是固定顺序（Tavily→Firecrawl→http），
-  但适配器在注册表里；`run` 返回 `{kind:'result'}` 或 `{kind:'unusable',reason}`。**整站爬 /
+- **新增抓取供应商同理走 `lib/fetch-backends.js`。** 抓取与搜索共用 `providerOrder`，没有单独固定顺序；
+  适配器在注册表里，`run` 返回 `{kind:'result'}` 或 `{kind:'unusable',reason}`。**整站爬 /
   反爬 / 结构化抽取 / 批量任务仍归 firecrawl MCP，绝不塞进本插件**——本插件只是 `web_fetch`
   的一条单 URL 路由。
 - **测试跟着降级路径写。** 这个插件的价值在「某一段挂了还能给出东西」，不在 happy path。

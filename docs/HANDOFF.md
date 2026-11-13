@@ -4,11 +4,11 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 112 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 123 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
-搜索按 `searchProviderOrder`、抓取按固定顺序，新增供应商只加注册项与配置字段，执行层不动。
+搜索与抓取共用一张 `providerOrder`（默认 `tavily`→`exa`→`firecrawl`），新增供应商只加注册项与配置字段，执行层不动。
 
 - 仓库：`https://github.com/Cyanix-0721/dsh-search-fetch-router`
 - 本地：`/home/slayer/repos/dsh-search-fetch-router`
@@ -21,37 +21,37 @@
 
 | 能力 | 链路 |
 | --- | --- |
-| 搜索 | 按 `searchProviderOrder`（默认 Tavily key 池）→ 宿主 `deepseek-official` 兜底 |
-| 抓取 | Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`（固定顺序，注册表驱动） |
+| 搜索 | 按 `providerOrder`（默认 `tavily`→`exa`→`firecrawl`）→ 宿主 `deepseek-official` 兜底 |
+| 抓取 | 同一份 `providerOrder`：Tavily `/extract` / Exa `/contents` / Firecrawl `/v2/scrape` → 本地 `http` 兜底（注册表驱动） |
 
-Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可用内容
-（正文为空、`failed_results` 非空、正文短于 `minContentChars`）。高级抓取交给 firecrawl MCP。
+抓取按顺序往下换：当前供应商报错、正文为空，或（Tavily）`failed_results` 非空 / 正文短于 `minContentChars`，就换下一家。高级抓取交给 firecrawl MCP。
 
 **刻意不做**「内容看起来不完整就升级」——猜错就是白花额度。
 
 密钥不进任何 YAML。配置只存 credentials 引用名，插件经 credentials 服务解析，失败
 再回退环境变量层。
 
-搜索供应商是一张声明式注册表（`lib/search-backends.js`）+ 配置项 `searchProviderOrder`：
-新增供应商只加注册项与配置字段，`execute` / `router` 不动，`client.js` 的 `KEY_GROUPS`
-加一行即可让它出现在密钥卡片里。详见设计文档「Adding a search provider」。
+搜索与抓取各是一张声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`），共用同一份 `providerOrder`：
+新增供应商只加注册项与配置字段，`execute` / `router` 不动；要出现在密钥卡片，`client.js`
+的供应商列表加一项即可。详见设计文档「Adding a search provider / Adding a fetch provider」。
 
 ## 已验证 / 未验证
 
 **已验证**
 
-- `npm test` → 112 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 123 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
   `doesNotThrow`，搜索 provider 仍注册。teardown 时 effect 会注销两个 provider。
 - 搜索供应商注册表是数据驱动的：`test/execute.test.js` 把一个假 backend 注入
-  `createRouter(..., { searchBackends })` 并写进 `searchProviderOrder`，断言它进链并被调用；
+  `createRouter(..., { searchBackends })` 并写进 `providerOrder`，断言它进链并被调用；
   `test/router.test.js` 覆盖 `planSearchChain` 新签名（去重 / 兜底 / 未知 id 跳过）。
-  client `RouterSettingsCard` 的密钥分组改由 `KEY_GROUPS` 驱动（行为不变，11 个 client 测试仍过）。
+  client `RouterSettingsCard` 的密钥分组由供应商列表驱动（`SEARCH_PROVIDERS` / `KEY_GROUPS`）。
 - 抓取后端同样是数据驱动的（`lib/fetch-backends.js` + `test/fetch-backends.test.js` 契约测试）：
   `lib/execute.js` 的 fetch 循环已无 `if (backend === ...)` 分支，与重构前逐字对齐（既有降级路径测试全过）。
 - 新增可选的 Exa 搜索供应商（keyed，`lib/exa.js`，注册进 `SEARCH_BACKENDS`）；`execute.search` 加了与抓取对称的总预算 `searchTotalBudgetMs`，耗尽抛 `WEB_SEARCH_BUDGET_EXHAUSTED`。
+- 搜索与抓取已合并成一张 `providerOrder`：Firecrawl 补了 `/v2/search` 搜索、Exa 补了 `/contents` 抓取，`planFetchChain` 改成与 `planSearchChain` 同构的数据驱动签名；`npm test` 123。
 - 执行层的「后端归属」有 debug 日志（`note()`），并有测试锁住（`test/execute.test.js` 断言 debug 行含 `served by fake`）。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。

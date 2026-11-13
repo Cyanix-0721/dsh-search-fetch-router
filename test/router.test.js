@@ -58,28 +58,32 @@ test('search chain: an unknown id in the order is skipped', () => {
   );
 });
 
-test('fetch chain: fixed order Tavily, Firecrawl, http', () => {
+test('fetch chain: follows providerOrder, http appended as fallback', () => {
+  const available = new Set(['tavily', 'exa', 'firecrawl', 'http']);
   assert.deepEqual(
-    planFetchChain({ hasFirecrawl: true, hasTavily: true, hasHttp: true, fallback: true }),
-    ['tavily', 'firecrawl', 'http'],
+    planFetchChain({ order: ['tavily', 'exa', 'firecrawl'], isAvailable: (id) => available.has(id), fallback: true }),
+    ['tavily', 'exa', 'firecrawl', 'http'],
   );
 });
 
 test('fetch chain: no backend is listed twice', () => {
-  const chain = planFetchChain({ hasFirecrawl: true, hasTavily: true, hasHttp: true, fallback: true });
+  const available = new Set(['tavily', 'exa', 'firecrawl', 'http']);
+  const chain = planFetchChain({ order: ['tavily', 'exa', 'firecrawl'], isAvailable: (id) => available.has(id), fallback: true });
   assert.equal(new Set(chain).size, chain.length);
 });
 
-test('fetch chain: no Firecrawl key drops it from the chain', () => {
+test('fetch chain: providers without keys are skipped, http still falls back', () => {
+  const available = new Set(['tavily', 'http']); // exa/firecrawl have no key
   assert.deepEqual(
-    planFetchChain({ hasFirecrawl: false, hasTavily: true, hasHttp: true, fallback: true }),
+    planFetchChain({ order: ['tavily', 'exa', 'firecrawl'], isAvailable: (id) => available.has(id), fallback: true }),
     ['tavily', 'http'],
   );
 });
 
 test('fetch chain: fallback disabled removes the local http provider', () => {
+  const available = new Set(['tavily', 'http']);
   assert.deepEqual(
-    planFetchChain({ hasFirecrawl: false, hasTavily: true, hasHttp: true, fallback: false }),
+    planFetchChain({ order: ['tavily'], isAvailable: (id) => available.has(id), fallback: false }),
     ['tavily'],
   );
 });

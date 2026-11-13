@@ -10,27 +10,31 @@ environment) and the plugin only ever holds a reference name.
 
 ## Routing
 
-**Search** — the provider order in `searchProviderOrder` (default `["tavily", "exa"]`;
-providers without a key are skipped at runtime), optionally falling back to the host's
-`deepseek-official` provider. The plugin-page key card lets you reorder (drag or arrows), disable, and add a
-note to each search provider, and shows a masked preview of each stored key.
+**Search & fetch** — both follow the same `providerOrder` (default
+`["tavily", "exa", "firecrawl"]`; providers without a key are skipped at runtime). For search
+the host's `deepseek-official` is appended as a fallback when `searchFallback` is on; for fetch
+the local `http` fetcher is appended when `fetchFallback` is on. Disabling a provider on the
+plugin-page card removes it from **both** chains. The card also lets you reorder (drag or
+arrows) and add a note to each provider, and shows a masked preview of each stored key.
 
-**Fetch** — one fixed chain: Tavily `/extract` → Firecrawl `/v2/scrape` → local `http`.
+Each provider is used for search and/or fetch depending on what it implements:
 
-Firecrawl is used when Tavily cannot do the job, in two cases only:
+| Provider | Search | Fetch |
+| --- | --- | --- |
+| Tavily | `/search` | `/extract` |
+| Exa | `/search` | `/contents` |
+| Firecrawl | `/v2/search` | `/v2/scrape` |
 
-1. Tavily errored (network, timeout, non-2xx);
-2. Tavily returned nothing usable — empty body, `failed_results` non-empty, or a body
-   shorter than `minContentChars`.
+A fetch walks the order and moves on to the next provider when the current one produced
+nothing usable — it errored, returned an empty body, or (Tavily) `failed_results` non-empty or
+a body shorter than `minContentChars`. There is deliberately no "content looks incomplete"
+heuristic; guessing costs credits on pages that were already fine.
 
-There is deliberately no "content looks incomplete" heuristic. Guessing costs Firecrawl
-credits on pages that were already fine.
+Anything fancier — multi-page crawl, anti-bot, structured extraction — is not this plugin's
+job. Use the firecrawl MCP tools for that.
 
-Anything fancier — multi-page crawl, anti-bot, structured extraction — is not this
-plugin's job. Use the firecrawl MCP tools for that.
-
-Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each backend gets
-`min(its own timeout, whatever is left)`; when less than 2 s remains, no new backend starts.
+Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each provider gets
+`min(its own timeout, whatever is left)`; when less than 2 s remains, no new provider starts.
 
 ## Adding a search provider
 
@@ -43,34 +47,35 @@ branch. To add one, touch three places:
    pool, set `keyRefsField: null` and implement `isAvailable(ctx)` instead.
 2. Add its key-refs array field and per-call timeout field to `lib/config.js` (both
    `.volatile()`).
-3. Have the user put its `id` into `searchProviderOrder`.
+3. Have the user put its `id` into `providerOrder`.
 
 A keyed provider (`keyRefsField` non-null) automatically gets rotation / cooldown / dead-key
 skipping; a keyless one is called once behind `isAvailable`. `lib/execute.js` and
 `lib/router.js` need no change. See the "a newly registered backend is picked up …" test in
 `test/execute.test.js`, which proves it by injecting a registry.
 
-The **API keys** card in the browser bundle currently lists only Tavily / Firecrawl; a new
-keyed provider needs one line in `KEY_GROUPS` in `lib/client.js` (the `run` and config
-fields can land first — the card can follow).
+The **API keys** card in the browser bundle renders a provider list from `lib/client.js`
+(`SEARCH_PROVIDERS`); a new keyed provider needs one entry there to show a key input (the
+`run` and config fields can land first — the card can follow).
 
 ## Adding a fetch provider
 
-Fetch backends are **declaratively registered** too (`lib/fetch-backends.js`), but the fetch
-chain is a **fixed order** (Tavily → Firecrawl → local http) rather than a user setting, kept
-predictable. To add one:
+Fetch backends are **declaratively registered** in `lib/fetch-backends.js` and share the same
+`providerOrder` as search — there is no separate fixed order. To add one:
 
 1. Add an entry to `FETCH_BACKENDS`: `id`, `label`, `keyRefsField`, `timeoutField`,
    `defaultTimeoutMs`, and `run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`.
    `run` returns `{kind:'result', result}` (success) or `{kind:'unusable', reason}` (nothing
-   usable — move on to the next backend without penalising the key); a thrown error is a
+   usable — move on to the next provider without penalising the key); a thrown error is a
    key-level failure that rotates the pool.
 2. Add its key-refs array and per-call timeout field to `lib/config.js` (both `.volatile()`).
-3. Add its id to `planFetchChain`'s fixed order in `lib/router.js`.
+3. If it should serve search too, register a search adapter under the same id in
+   `lib/search-backends.js`; otherwise it only appears in the fetch chain.
+4. Have the user put its `id` into `providerOrder`.
 
 **Boundary:** whole-site crawling, anti-bot handling, structured extraction and batch jobs do
 **not** belong here — they go to the firecrawl MCP. This plugin only routes a single-URL
-`web_fetch`. `lib/execute.js` needs no change.
+`web_fetch`. `lib/execute.js` and `lib/router.js` need no change.
 
 ## Install
 
@@ -172,7 +177,7 @@ live.
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
-| `searchProviderOrder` | `["tavily", "exa"]` | search provider ids = enable order; keyless ones are skipped at runtime. The card's reorder/disable edits this list; `deepseek-official` is the fallback |
+| `providerOrder` | `["tavily", "exa"]` | search provider ids = enable order; keyless ones are skipped at runtime. The card's reorder/disable edits this list; `deepseek-official` is the fallback |
 | `keyNotes` | `{}` | per-key local notes (ref → one line), display only |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |

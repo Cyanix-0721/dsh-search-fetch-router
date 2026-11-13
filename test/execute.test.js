@@ -473,7 +473,7 @@ test('fetch: a Tavily error (not just unusable content) escalates to Firecrawl',
   }
 });
 
-test('search: a newly registered backend is picked up via searchProviderOrder with no code branch', async () => {
+test('search: a newly registered backend is picked up via providerOrder with no code branch', async () => {
   const calls = [];
   const fakeBackend = {
     id: 'fake',
@@ -488,7 +488,7 @@ test('search: a newly registered backend is picked up via searchProviderOrder wi
   };
   // 用普通对象配置，绕过 schema 里没有的 fakeApiKeyRefs——read() 直接读裸值即可。
   const config = {
-    searchProviderOrder: ['fake'],
+    providerOrder: ['fake'],
     fakeApiKeyRefs: ['FAKE_KEY'],
     fakeTimeoutMs: 5_000,
     cooldownMs: 60_000,
@@ -501,7 +501,7 @@ test('search: a newly registered backend is picked up via searchProviderOrder wi
   assert.deepEqual(calls, [{ apiKey: 'fk', query: 'q' }]);
 });
 
-test('search: an unknown id in searchProviderOrder is skipped, not fatal', async () => {
+test('search: an unknown id in providerOrder is skipped, not fatal', async () => {
   const calls = [];
   const fakeBackend = {
     id: 'fake',
@@ -515,7 +515,7 @@ test('search: an unknown id in searchProviderOrder is skipped, not fatal', async
     },
   };
   const config = {
-    searchProviderOrder: ['ghost', 'fake'],
+    providerOrder: ['ghost', 'fake'],
     fakeApiKeyRefs: ['FAKE_KEY'],
     fakeTimeoutMs: 5_000,
     cooldownMs: 60_000,
@@ -541,7 +541,7 @@ test('search: debug log records which backend served the request', async () => {
     },
   };
   const config = {
-    searchProviderOrder: ['fake'],
+    providerOrder: ['fake'],
     fakeApiKeyRefs: ['FAKE_KEY'],
     fakeTimeoutMs: 5_000,
     cooldownMs: 60_000,
@@ -556,7 +556,7 @@ test('search: debug log records which backend served the request', async () => {
   assert.ok(debugLines.some((line) => line.includes('served by fake')), debugLines.join('\n'));
 });
 
-test('search: exa is used when listed in searchProviderOrder', async () => {
+test('search: exa is used when listed in providerOrder', async () => {
   const stub = stubFetch((url) => {
     if (url.includes('api.exa.ai')) {
       return Response.json({ results: [{ title: 'E', url: 'https://e.example', text: 'snippet' }] });
@@ -565,7 +565,7 @@ test('search: exa is used when listed in searchProviderOrder', async () => {
   });
   try {
     const ctx = fakeCtx({ credentials: fakeCredentials({ EXA_API_KEY: 'ek' }) });
-    const router = createRouter(ctx, configWith({ searchProviderOrder: ['exa'] }));
+    const router = createRouter(ctx, configWith({ providerOrder: ['exa'] }));
     const result = await router.search({ query: 'hello' }, undefined);
     assert.equal(result.sources[0].url, 'https://e.example');
     assert.equal(stub.calls.length, 1);

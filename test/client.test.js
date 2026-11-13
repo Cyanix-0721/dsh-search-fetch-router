@@ -392,14 +392,14 @@ test('client: add is disabled when the form cannot mutate', () => {
   );
 });
 
-test('client: disabling a search provider removes it from searchProviderOrder', async () => {
+test('client: disabling a search provider removes it from providerOrder', async () => {
   const { captured, require } = loadBundle();
   const exported = captured.factory(require);
   const { ctx, registrations, state } = fakeContext({
     tavilyApiKeyRefs: ['TAVILY_API_KEY'],
     exaApiKeyRefs: ['EXA_API_KEY'],
     firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
-    searchProviderOrder: ['tavily', 'exa'],
+    providerOrder: ['tavily', 'exa'],
   });
   exported.apply(ctx);
   const { Component } = registrations[0];
@@ -411,18 +411,18 @@ test('client: disabling a search provider removes it from searchProviderOrder', 
   assert.equal(disableButtons.length, 2);
   await disableButtons[1].props.onClick(); // exa
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['searchProviderOrder'], value: ['tavily'] },
+    { op: 'set', path: ['providerOrder'], value: ['tavily'] },
   ]);
 });
 
-test('client: move down reorders searchProviderOrder', async () => {
+test('client: move down reorders providerOrder', async () => {
   const { captured, require } = loadBundle();
   const exported = captured.factory(require);
   const { ctx, registrations, state } = fakeContext({
     tavilyApiKeyRefs: ['TAVILY_API_KEY'],
     exaApiKeyRefs: ['EXA_API_KEY'],
     firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
-    searchProviderOrder: ['tavily', 'exa'],
+    providerOrder: ['tavily', 'exa'],
   });
   exported.apply(ctx);
   const { Component } = registrations[0];
@@ -434,18 +434,18 @@ test('client: move down reorders searchProviderOrder', async () => {
   assert.equal(downButtons.length, 1);
   await downButtons[0].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['searchProviderOrder'], value: ['exa', 'tavily'] },
+    { op: 'set', path: ['providerOrder'], value: ['exa', 'tavily'] },
   ]);
 });
 
-test('client: rendered search-provider order follows searchProviderOrder', () => {
+test('client: rendered search-provider order follows providerOrder', () => {
   const { captured, require } = loadBundle();
   const exported = captured.factory(require);
   const { ctx, registrations } = fakeContext({
     tavilyApiKeyRefs: ['TAVILY_API_KEY'],
     exaApiKeyRefs: ['EXA_API_KEY'],
     firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
-    searchProviderOrder: ['exa', 'tavily'],
+    providerOrder: ['exa', 'tavily'],
   });
   exported.apply(ctx);
   const { Component } = registrations[0];
@@ -454,7 +454,7 @@ test('client: rendered search-provider order follows searchProviderOrder', () =>
   assert.deepEqual(
     collectKeyInputs(tree).map((i) => i.props['data-sfr-key']),
     ['EXA_API_KEY', 'TAVILY_API_KEY', 'FIRECRAWL_API_KEY'],
-    'groups render in searchProviderOrder, then fetch groups',
+    'groups render in providerOrder, then fetch groups',
   );
 });
 

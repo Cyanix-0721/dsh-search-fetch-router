@@ -9,17 +9,19 @@
 
 ## 路由
 
-**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 `["tavily", "exa"]`，没配 key 的供应商运行时自动跳过），最后可回落宿主的 `deepseek-official`。插件页的密钥卡片可对搜索供应商拖拽或上下箭头排序、停用、写备注，并显示已保存 key 的掩码预览。
+**搜索与抓取** —— 都按同一份 `providerOrder`（默认 `["tavily", "exa", "firecrawl"]`，没配 key 的供应商运行时自动跳过）。搜索在末尾追加宿主的 `deepseek-official` 兜底（受 `searchFallback` 控制）；抓取在末尾追加本地 `http` 兜底（受 `fetchFallback` 控制）。在插件页卡片上停用一家，**两条链都不用它**。卡片还可以拖拽或上下箭头排序、给每家写备注，并显示已保存 key 的掩码预览。
 
-**抓取** —— 固定一条链：Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`。
+每家供应商按它实现了什么来决定用于搜索和/或抓取：
 
-只有两种情况会动用 Firecrawl：
+| 供应商 | 搜索 | 抓取 |
+| --- | --- | --- |
+| Tavily | `/search` | `/extract` |
+| Exa | `/search` | `/contents` |
+| Firecrawl | `/v2/search` | `/v2/scrape` |
 
-1. Tavily 报错（网络、超时、非 2xx）；
-2. Tavily 没拿到可用的东西——正文为空、`failed_results` 非空，或正文短于
-   `minContentChars`。
-
-**刻意不做**「内容看起来不完整」这种猜测。猜错就是白花 Firecrawl 的额度。
+抓取按顺序往下走，当前这家「没给出可用内容」就换下一家——报错、正文为空，或（Tavily）
+`failed_results` 非空、正文短于 `minContentChars`。**刻意不做**「内容看起来不完整」这种猜测，
+猜错就是白花额度。
 
 再花哨的——整站爬、反爬、结构化抽取——不是本插件的活，走 firecrawl MCP。
 
@@ -35,30 +37,31 @@
    `run` 返回 seam 的 `WebSearchResult`。宿主自带、没有 key 池的能力把 `keyRefsField`
    设成 `null`，改为实现 `isAvailable(ctx)`。
 2. `lib/config.js` 加该供应商的 key refs 数组字段与单次超时字段（都要 `.volatile()`）。
-3. 用户把它的 `id` 填进 `searchProviderOrder`。
+3. 用户把它的 `id` 填进 `providerOrder`。
 
 有 key 池的供应商（`keyRefsField` 非空）自动获得轮转 / 冷却 / 失效跳过；无 key 的走
 `isAvailable` 单次调用。`lib/execute.js` 与 `lib/router.js` 都不用改。测试见
 `test/execute.test.js` 里「a newly registered backend is picked up …」——它用注入注册表
 证明这一点。
 
-客户端的「API 密钥」卡片目前只列 Tavily / Firecrawl 两组；新增带 key 的供应商要先在
-`lib/client.js` 的 `KEY_GROUPS` 里加一行（`run` 与配置字段可以先落地，卡片可以后补）。
+客户端的「API 密钥」卡片由 `lib/client.js` 的供应商列表（`SEARCH_PROVIDERS`）渲染；
+新增带 key 的供应商在那里加一项就会出现输入框（`run` 与配置字段可以先落地，卡片可以后补）。
 
 ## 新增抓取供应商
 
-抓取后端同样是**声明式注册**的（`lib/fetch-backends.js`），但抓取链是**固定顺序**
-（Tavily → Firecrawl → 本地 http），不开放给用户排序——保持可预测。要加一个抓取供应商：
+抓取后端同样是**声明式注册**的（`lib/fetch-backends.js`），并且与搜索**共用同一份
+`providerOrder`**——没有单独的固定顺序。要加一个抓取供应商：
 
 1. 在 `FETCH_BACKENDS` 里加一项：`id`、`label`、`keyRefsField`、`timeoutField`、
    `defaultTimeoutMs`、`run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`。
    `run` 返回 `{kind:'result', result}`（成功）或 `{kind:'unusable', reason}`（本后端没给出
-   可用内容，换下一个后端、不惩罚 key）；抛错则视为 key 级失败、换下一把。
+   可用内容，换下一家、不惩罚 key）；抛错则视为 key 级失败、换下一把。
 2. `lib/config.js` 加 key refs 数组与单次超时字段（都要 `.volatile()`）。
-3. 在 `lib/router.js` 的 `planFetchChain` 里把它的 id 加进固定顺序。
+3. 如果它也要做搜索，在 `lib/search-backends.js` 用同一个 id 注册一个搜索适配器；否则只出现在抓取链里。
+4. 用户把它的 id 填进 `providerOrder`。
 
 **边界**：整站爬、反爬、结构化抽取、批量任务**不属于本插件**，交给 firecrawl MCP。
-本插件只是单 URL `web_fetch` 的一条路由。`lib/execute.js` 不改。
+本插件只是单 URL `web_fetch` 的一条路由。`lib/execute.js` 与 `lib/router.js` 都不用改。
 
 ## 安装
 
@@ -149,7 +152,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
-| `searchProviderOrder` | `["tavily", "exa"]` | 搜索供应商尝试顺序 = 启用顺序；没配 key 的运行时跳过。插件页的排序/停用改的就是它；官方 `deepseek-official` 作兜底 |
+| `providerOrder` | `["tavily", "exa"]` | 搜索供应商尝试顺序 = 启用顺序；没配 key 的运行时跳过。插件页的排序/停用改的就是它；官方 `deepseek-official` 作兜底 |
 | `keyNotes` | `{}` | 每把 key 的本机备注（ref→一句话），只展示不参与请求 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |

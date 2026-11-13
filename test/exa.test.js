@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { searchExa } from '../lib/exa.js';
+import { contentsExa, searchExa } from '../lib/exa.js';
 
 /** 替换 globalThis.fetch，记录调用，测试后恢复。 */
 function stubFetch(handler) {
@@ -95,6 +95,51 @@ test('exa: a non-JSON body throws a stable error', async () => {
     await assert.rejects(
       searchExa({ apiKey: 'ek', query: 'q', timeoutMs: 1_000 }),
       /not JSON/,
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: posts the url and returns the first result text', async () => {
+  const stub = stubFetch(() =>
+    Response.json({ results: [{ url: 'https://a.example', text: '# Hello\nBody' }] }),
+  );
+  try {
+    const { content } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000, maxBodyChars: 5_000 });
+    assert.equal(content, '# Hello\nBody');
+    assert.equal(stub.calls.length, 1);
+    assert.equal(stub.calls[0].init.method, 'POST');
+    assert.match(stub.calls[0].url, /api\.exa\.ai\/contents$/);
+    assert.equal(stub.calls[0].init.headers['x-api-key'], 'ek');
+    const body = JSON.parse(stub.calls[0].init.body);
+    assert.deepEqual(body.urls, ['https://a.example']);
+    assert.equal(body.text.maxCharacters, 5_000);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: an empty result set yields empty content, not an error', async () => {
+  const stub = stubFetch(() => Response.json({ results: [] }));
+  try {
+    const { content } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(content, '');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: a non-2xx response throws with the HTTP status', async () => {
+  const stub = stubFetch(() => new Response('nope', { status: 500 }));
+  try {
+    await assert.rejects(
+      contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 }),
+      (error) => {
+        assert.match(error.message, /HTTP 500/);
+        assert.equal(error.status, 500);
+        return true;
+      },
     );
   } finally {
     stub.restore();

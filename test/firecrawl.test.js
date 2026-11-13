@@ -1,7 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { buildScrapeBody, mapScrapeResponse } from '../lib/firecrawl.js';
+import { buildScrapeBody, mapScrapeResponse, searchFirecrawl } from '../lib/firecrawl.js';
+
+/** 替换 globalThis.fetch，记录调用，测试后恢复。 */
+function stubFetch(handler) {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    const href = typeof url === 'string' ? url : String(url);
+    calls.push({ url: href, init });
+    return handler(href, init);
+  };
+  return {
+    calls,
+    restore() {
+      globalThis.fetch = original;
+    },
+  };
+}
 
 test('body: markdown only, with the configured knobs', () => {
   const body = buildScrapeBody('https://example.com/a', {
@@ -84,4 +101,74 @@ test('map: the resolved URL prefers metadata.url, then sourceURL, then the reque
 test('map: a missing markdown field becomes an empty body', () => {
   const result = mapScrapeResponse({ data: { metadata: {} } }, 'https://example.com', { maxBodyChars: 10 });
   assert.equal(result.body.content, '');
+});
+
+test('search: posts query + limit and maps data.web into sources', async () => {
+  const stub = stubFetch(() =>
+    Response.json({
+      success: true,
+      data: {
+        web: [
+          { title: 'Alpha', url: 'https://a.example', description: 'first' },
+          { title: 'Beta', url: 'https://b.example', markdown: '# Body' },
+          { noUrl: true },
+        ],
+      },
+    }),
+  );
+  try {
+    const result = await searchFirecrawl({ apiKey: 'fc-key', query: 'hello', maxResults: 5, timeoutMs: 1_000 });
+    assert.deepEqual(result, {
+      sources: [
+        { url: 'https://a.example', title: 'Alpha', snippet: 'first' },
+        { url: 'https://b.example', title: 'Beta', snippet: '# Body' },
+      ],
+      truncated: false,
+    });
+    assert.equal(stub.calls.length, 1);
+    assert.equal(stub.calls[0].init.method, 'POST');
+    assert.match(stub.calls[0].url, /api\.firecrawl\.dev\/v2\/search$/);
+    assert.equal(stub.calls[0].init.headers.authorization, 'Bearer fc-key');
+    const body = JSON.parse(stub.calls[0].init.body);
+    assert.equal(body.query, 'hello');
+    assert.equal(body.limit, 5);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: clamps limit to the documented maximum of 100', async () => {
+  const stub = stubFetch(() => Response.json({ success: true, data: { web: [] } }));
+  try {
+    await searchFirecrawl({ apiKey: 'fc-key', query: 'q', maxResults: 500, timeoutMs: 1_000 });
+    assert.equal(JSON.parse(stub.calls[0].init.body).limit, 100);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: an empty web array yields empty sources, not an error', async () => {
+  const stub = stubFetch(() => Response.json({ success: true, data: { web: [] } }));
+  try {
+    const result = await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 1_000 });
+    assert.deepEqual(result, { sources: [], truncated: false });
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: a non-2xx response throws with the HTTP status', async () => {
+  const stub = stubFetch(() => new Response('bad', { status: 402 }));
+  try {
+    await assert.rejects(
+      searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 1_000 }),
+      (error) => {
+        assert.match(error.message, /HTTP 402/);
+        assert.equal(error.status, 402);
+        return true;
+      },
+    );
+  } finally {
+    stub.restore();
+  }
 });

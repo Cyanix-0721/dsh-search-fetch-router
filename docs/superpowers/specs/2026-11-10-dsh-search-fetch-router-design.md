@@ -36,7 +36,7 @@ JavaScript. The user's actual usage is different:
   That is `dsh-tavily-pool`'s ~3000-line territory; this plugin deliberately stays small.
 - A custom settings panel. Every field is a `volatile` schema entry.
 - A quota-aware scheduling or provider-ranking engine. The search chain is a plain,
-  user-ordered list (`searchProviderOrder`) that falls back to `deepseek-official` — adding a
+  user-ordered list (`providerOrder`) that falls back to `deepseek-official` — adding a
   provider is a registry entry, not a policy.
 - Replacing the host's tool layer (`web_search` / `web_fetch` tool names are unchanged).
 
@@ -50,7 +50,8 @@ index.js            apply(): register providers, nothing else
         ├── lib/fetch-backends.js   declarative fetch backend registry (single-URL only)
         ├── lib/keyring.js    refs pool: rotate, cooldown, permanent death
         ├── lib/tavily.js     POST /search, POST /extract
-        ├── lib/firecrawl.js  POST /v2/scrape
+        ├── lib/exa.js        POST /search, POST /contents
+        ├── lib/firecrawl.js  POST /v2/scrape, POST /v2/search
         ├── lib/official.js   host's DeepSeekSearchProvider + HttpFetchProvider
         ├── lib/urls.js       URL validation
         ├── lib/errors.js     stable codes, WebError wrapping
@@ -68,21 +69,21 @@ credentials service.
 
 Search backends are declarative. `lib/search-backends.js` holds a registry; each entry is
 `{id, label, keyRefsField|null, timeoutField|null, defaultTimeoutMs, isAvailable?, run()}`.
-The chain is built from the user's `searchProviderOrder` (default `["tavily"]`), then the
+The chain is built from the user's `providerOrder` (default `["tavily", "exa", "firecrawl"]`), then the
 `deepseek-official` fallback is appended when `searchFallback` is on. A keyed backend gets the
 `KeyRing` rotation/cooldown for free; a keyless one (`deepseek-official`) is called once.
 `lib/execute.js` and `lib/router.js` are data-driven and contain no `if (backend === ...)`.
 
 ```
-searchProviderOrder: [ tavily, … ] ──(all keys failed)──> deepseek-official (fallback)
+providerOrder: [ tavily, … ] ──(all keys failed)──> deepseek-official (fallback)
 ```
 
 `deepseek-official` is constructed directly (`new DeepSeekSearchProvider(resolveOptions)`)
 rather than re-registering its settings namespace — that namespace belongs to the host and
 cannot be installed twice.
 
-Built-in search providers are `tavily` and `exa` (both keyed; `exa` is opt-in via
-`searchProviderOrder`), with `deepseek-official` as the keyless fallback.
+Built-in search providers are `tavily`, `exa` and `firecrawl` (all keyed), with
+`deepseek-official` as the keyless fallback.
 
 #### Adding a search provider
 
@@ -90,19 +91,21 @@ Built-in search providers are `tavily` and `exa` (both keyed; `exa` is opt-in vi
    `{apiKey, ctx, request, signal, timeoutMs}`; a keyless one receives `{ctx, request, signal}`.
    Add `isAvailable(ctx)` only if it is keyless.
 2. Add its config field(s) in `lib/config.js` (a `…ApiKeyRefs` string array for a keyed one).
-3. The user puts its `id` into `searchProviderOrder`, or config ships it as a default.
+3. The user puts its `id` into `providerOrder`, or config ships it as a default.
 4. `lib/client.js` `KEY_GROUPS` gets one line if it needs a key input in the settings card.
 
 No change to `lib/execute.js` / `lib/router.js`. `test/execute.test.js` proves it: injecting a
 fake backend into `createRouter(..., { searchBackends })` and listing its id in
-`searchProviderOrder` is enough for it to enter the chain and be called.
+`providerOrder` is enough for it to enter the chain and be called.
 
 ### Fetch
 
-The fetch chain is a plain, fixed order — this plugin is a router, not a crawler:
+The fetch chain is the **same `providerOrder`** as search — this plugin is a router, not a
+crawler. Each provider is tried in order, then the local `http` fetcher is appended when
+`fetchFallback` is on:
 
 ```
-Tavily /extract ──> Firecrawl scrape ──> local HTTP
+providerOrder: [ tavily /extract, exa /contents, firecrawl /v2/scrape, … ] ──> local HTTP
 ```
 
 Fetch backends are declarative too (`lib/fetch-backends.js`); each entry is
@@ -110,16 +113,16 @@ Fetch backends are declarative too (`lib/fetch-backends.js`); each entry is
 `lib/execute.js` loops the chain from `planFetchChain` and dispatches through the registry: a
 keyed backend rotates its key pool, a keyless one (`http`) is called once. `run` returns
 `{kind:'result', result}` or `{kind:'unusable', reason}` (the backend produced nothing usable —
-move to the next backend **without** penalising the key); a thrown error penalises the key.
+move to the next provider **without** penalising the key); a thrown error penalises the key.
 
-Escalation from Tavily to Firecrawl happens on exactly two signals (there is no URL whitelist
-any more):
+A provider yields "nothing usable" on exactly these signals (there is no URL whitelist any
+more):
 
-1. the Tavily request threw (network, timeout, non-2xx);
-2. Tavily returned nothing usable:
-   - `results` empty or `raw_content` empty,
-   - `failed_results[]` non-empty,
-   - content shorter than `minContentChars` (when that is > 0).
+1. the request threw (network, timeout, non-2xx);
+2. it returned nothing usable:
+   - an empty body (Exa / Firecrawl),
+   - **Tavily only:** `results` / `raw_content` empty, `failed_results[]` non-empty, or content
+     shorter than `minContentChars` (when that is > 0).
 
 Note that Tavily's `/extract` returns **HTTP 200 with an empty `results` array** when every
 URL fails. Treating 200 as success would silently produce empty pages, so the response
@@ -134,8 +137,9 @@ mapper distinguishes success from failure explicitly.
 1. Register it in `lib/fetch-backends.js` — `run({apiKey, ctx, request, signal, budgetMs, read, maxBodyChars})`
    returning `{kind:'result', result}` or `{kind:'unusable', reason}`.
 2. Add its config fields in `lib/config.js` (a `…ApiKeyRefs` array + a `…TimeoutMs`), all `.volatile()`.
-3. Extend `planFetchChain` in `lib/router.js` with its id (fetch order is fixed, not a user
-   setting — keep it predictable).
+3. Put its `id` into `providerOrder` (shared with search — there is no separate fetch order).
+   If it should also serve search, register a search adapter under the same id in
+   `lib/search-backends.js`.
 
 ### Budget
 
@@ -153,6 +157,7 @@ smaller than the tool's.
 
 ```js
 tavilyApiKeyRefs: z.array(z.string()).default(['TAVILY_API_KEY'])
+exaApiKeyRefs: z.array(z.string()).default(['EXA_API_KEY'])
 firecrawlApiKeyRefs: z.array(z.string()).default(['FIRECRAWL_API_KEY'])
 ```
 
@@ -241,7 +246,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 `node --test`, no framework, no build step. 112 tests.
 
-- `test/router.test.js` — data-driven search chain order (`searchProviderOrder`, including
+- `test/router.test.js` — data-driven search chain order (`providerOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.
   Pure functions, no stubs.
 - `test/urls.test.js` — glob semantics (`*` vs `**`), match surface, URL validation.
@@ -255,7 +260,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
   the network; aborted signal never reaches the network; budget exhaustion is distinguished
   from failure.
 - `test/execute.test.js` also proves the search registry extension point: a fake backend passed
-  via `createRouter(..., { searchBackends })` and named in `searchProviderOrder` enters the
+  via `createRouter(..., { searchBackends })` and named in `providerOrder` enters the
   chain and is called, with no code branch to add. The fetch chain dispatches through its own
   registry the same way, with every pre-registry degradation path preserved exactly.
 
