@@ -1,7 +1,7 @@
 {
   "name": "dsh-search-fetch-router",
   "version": "0.1.0",
-  "description": "Tavily-first web search and fetch router for DeepSeek Harness: Tavily key pool, Firecrawl escalation, official fallback, credentials-only keys.",
+  "description": "Declarative web search & fetch router for DeepSeek Harness: one ordered provider list (Tavily / Exa / Firecrawl) with key-pool rotation, single-URL fetch, official/local-http fallback, and credentials-only keys.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -18,6 +18,7 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh-CN.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "license": "MIT",
@@ -33,7 +34,9 @@
     "tavily",
     "firecrawl",
     "web-search",
-    "web-fetch"
+    "web-fetch",
+    "exa",
+    "provider-router"
   ],
   "engines": {
     "dsh": ">=0.2.2-rc.1",

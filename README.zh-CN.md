@@ -65,7 +65,7 @@
 
 ## 安装
 
-还没发到 npm，直接从仓库装：
+还没发到 npm（包名待定），直接从仓库装：
 
 ```bash
 npx --yes @deepseek-ai/dsh plugin --profile web add \
