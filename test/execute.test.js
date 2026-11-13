@@ -762,3 +762,34 @@ test('fetch: a backend returning unusable hands over to the next one without pen
   assert.equal(result.body.content, 'second time lucky');
   assert.deepEqual(seen, ['empty', 'good']);
 });
+
+test('fetch: a keyless backend that reports itself unavailable is skipped, not called', async () => {
+  const seen = [];
+  const unavailable = {
+    id: 'selfhosted',
+    label: 'Self hosted',
+    keyRefsField: null,
+    timeoutField: 'selfHostedTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    isAvailable() {
+      return false;
+    },
+    async run() {
+      seen.push('selfhosted');
+      throw new Error('must not be called');
+    },
+  };
+  const config = {
+    providerOrder: ['selfhosted'],
+    fetchFallback: false,
+    maxBodyChars: 100_000,
+    totalBudgetMs: 45_000,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { fetchBackends: { selfhosted: unavailable } });
+  await assert.rejects(
+    () => router.fetch({ url: 'https://fake.example/z' }, undefined),
+    /no web fetch provider is usable/,
+  );
+  assert.deepEqual(seen, [], 'an unavailable backend must never be invoked');
+});
