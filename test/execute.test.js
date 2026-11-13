@@ -982,3 +982,83 @@ test('search: a 200 error body does not cool down the key, because the key is no
     stub.restore();
   }
 });
+
+// --- 覆盖补齐：keyless 分支的错误处理、credentials 抛错、note 吞日志异常 ---
+
+test('search: a keyless backend that throws is recorded as a failure and reported', async () => {
+  const keyless = {
+    id: 'fkless', label: 'FK', keyRefsField: null, timeoutField: null, defaultTimeoutMs: 5_000,
+    isAvailable: () => true,
+    async run() { throw new Error('kaboom'); },
+  };
+  const config = { providerOrder: ['fkless'], searchFallback: false, searchTotalBudgetMs: 30_000, cooldownMs: 60_000 };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { searchBackends: { fkless: keyless } });
+  await assert.rejects(() => router.search({ query: 'q' }, undefined), /kaboom/);
+});
+
+test('search: an aborted keyless backend surfaces as WEB_ABORTED, not a backend failure', async () => {
+  const keyless = {
+    id: 'fkless', label: 'FK', keyRefsField: null, timeoutField: null, defaultTimeoutMs: 5_000,
+    isAvailable: () => true,
+    async run() { const e = new Error('aborted'); e.name = 'AbortError'; throw e; },
+  };
+  const config = { providerOrder: ['fkless'], searchFallback: false, searchTotalBudgetMs: 30_000, cooldownMs: 60_000 };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { searchBackends: { fkless: keyless } });
+  await assert.rejects(
+    () => router.search({ query: 'q' }, undefined),
+    (error) => error.code === 'WEB_ABORTED',
+  );
+});
+
+test('fetch: a keyless backend that throws is recorded as a failure and reported', async () => {
+  const keyless = {
+    id: 'fkless', label: 'FK', keyRefsField: null, timeoutField: null, defaultTimeoutMs: 5_000,
+    async run() { throw new Error('kaboom-fetch'); },
+  };
+  const config = { providerOrder: ['fkless'], fetchFallback: false, maxBodyChars: 100_000, totalBudgetMs: 45_000 };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { fetchBackends: { fkless: keyless } });
+  await assert.rejects(() => router.fetch({ url: 'https://fake.example/e' }, undefined), /kaboom-fetch/);
+});
+
+test('fetch: an aborted keyless backend surfaces as WEB_ABORTED, not a backend failure', async () => {
+  const keyless = {
+    id: 'fkless', label: 'FK', keyRefsField: null, timeoutField: null, defaultTimeoutMs: 5_000,
+    async run() { const e = new Error('aborted'); e.name = 'AbortError'; throw e; },
+  };
+  const config = { providerOrder: ['fkless'], fetchFallback: false, maxBodyChars: 100_000, totalBudgetMs: 45_000 };
+  const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+  const router = createRouter(ctx, config, { fetchBackends: { fkless: keyless } });
+  await assert.rejects(
+    () => router.fetch({ url: 'https://fake.example/e' }, undefined),
+    (error) => error.code === 'WEB_ABORTED',
+  );
+});
+
+test('search: a credentials service that throws is treated as "not configured", not a crash', async () => {
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run() { throw new Error('must not run without a key'); },
+  };
+  const config = { providerOrder: ['fake'], fakeApiKeyRefs: ['X'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false };
+  const ctx = fakeCtx({ credentials: { async resolve() { throw new Error('credentials down'); } } });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  await assert.rejects(() => router.search({ query: 'q' }, undefined), /no web search provider is usable/);
+});
+
+test('note: a throwing logger never breaks the request', async () => {
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run() { return { sources: [{ url: 'https://fake.example/log' }], truncated: false }; },
+  };
+  const config = { providerOrder: ['fake'], fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false };
+  const ctx = fakeCtx({
+    credentials: fakeCredentials({ FAKE_KEY: 'fk' }),
+    logger: { warn() {}, debug() { throw new Error('logger exploded'); }, info() { throw new Error('logger exploded'); } },
+  });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/log');
+});

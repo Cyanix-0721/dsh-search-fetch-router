@@ -239,3 +239,29 @@ test('exa: normalizeSearchType accepts only the documented values', () => {
   assert.equal(normalizeSearchType(' deep-lite '), 'deep-lite');
   assert.equal(normalizeSearchType('  '), 'auto');
 });
+
+test('exa contents: status entry with httpStatusCode but no tag reports the HTTP code', async () => {
+  const prev = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true, status: 200, headers: { get: () => null },
+    json: async () => ({ results: [], statuses: [{ id: 'https://a.example', status: 'error', error: { httpStatusCode: 504 } }] }),
+    text: async () => '',
+  });
+  try {
+    const { failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(failure, 'upstream reported HTTP 504');
+  } finally { globalThis.fetch = prev; }
+});
+
+test('exa contents: status entry with neither tag nor http code falls back to the raw status', async () => {
+  const prev = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true, status: 200, headers: { get: () => null },
+    json: async () => ({ results: [], statuses: [{ id: 'https://a.example', status: 'error' }] }),
+    text: async () => '',
+  });
+  try {
+    const { failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(failure, 'upstream reported status "error"');
+  } finally { globalThis.fetch = prev; }
+});

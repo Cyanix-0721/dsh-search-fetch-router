@@ -134,3 +134,15 @@ test('requestFailure: marked request-level so the key pool leaves the key alone'
   assert.equal(failure.requestLevel, true);
   assert.match(failure.message, /Demo \/x reported an error: blocked/);
 });
+
+test('errorPayload: reads an upstream errors[] array (string or object entries)', () => {
+  // 有些上游把原因放 errors 数组而不是单数字段。
+  assert.equal(errorPayload({ errors: ['rate limited'] }, ['results']), 'rate limited');
+  assert.equal(errorPayload({ errors: [{ message: 'blocked by anti-bot' }] }, ['results']), 'blocked by anti-bot');
+  assert.equal(errorPayload({ errors: [{ detail: 'quota' }] }, ['results']), 'quota');
+  // 空数组 / 无可用文本的条目：不算错误体，落到最后的 undefined。
+  assert.equal(errorPayload({ errors: [] }, ['results']), undefined);
+  assert.equal(errorPayload({ errors: [{}] }, ['results']), undefined);
+  // 完全没有可识别字段：正常响应。
+  assert.equal(errorPayload({ resultCount: 0 }, ['results']), undefined);
+});
