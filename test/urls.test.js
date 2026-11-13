@@ -42,3 +42,15 @@ test('url: every rejection carries WEB_INVALID_URL', () => {
     assert.equal(error.code, 'WEB_INVALID_URL');
   }
 });
+
+test('url: a URL the parser itself rejects is reported as invalid, not thrown raw', () => {
+  // 空串、超长、非 http 都有各自的检查，但 `http://[` 这种能过长度检查、在 `new URL`
+  // 里才炸的输入必须也变成 WEB_INVALID_URL——否则工具层收到一个没有 code 的 TypeError。
+  for (const bad of ['http://[', 'http://exa mple.com', 'https://%zz']) {
+    assert.throws(
+      () => assertFetchableUrl(bad, makeError),
+      (error) => error.code === 'WEB_INVALID_URL',
+      `${bad} must be rejected with WEB_INVALID_URL`,
+    );
+  }
+});
