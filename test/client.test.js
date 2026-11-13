@@ -500,3 +500,26 @@ test('client: provider ordering helpers (toggle / move-before / swap / merge)', 
   assert.deepEqual(swapItem(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c']);
   assert.deepEqual(swapItem(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c']); // out of range
 });
+
+test('orderFor: 没配过时回退到供应商表派生的默认顺序', () => {
+  const { captured, require } = loadBundle();
+  const { orderFor, DEFAULT_ORDER } = captured.factory(require).__test;
+  assert.deepEqual(orderFor(undefined), [...DEFAULT_ORDER]);
+  assert.deepEqual(orderFor({ getSnapshot: () => ({ value: {} }) }), [...DEFAULT_ORDER]);
+});
+
+test('orderFor: 空数组代表「全部停用」，不能回退成默认', () => {
+  // 这是真会出错的场景：用户把三家全停用，卡片若回退默认就会显示成全部启用，
+  // 与运行时（一个 key 都不用）正好相反。
+  const { captured, require } = loadBundle();
+  const { orderFor } = captured.factory(require).__test;
+  assert.deepEqual(orderFor({ getSnapshot: () => ({ value: { providerOrder: [] } }) }), []);
+});
+
+test('orderFor: 默认顺序与供应商表一致，且不含无 key 的兜底', () => {
+  const { captured, require } = loadBundle();
+  const { DEFAULT_ORDER } = captured.factory(require).__test;
+  assert.deepEqual([...DEFAULT_ORDER], ['tavily', 'exa', 'firecrawl']);
+  assert.ok(!DEFAULT_ORDER.includes('deepseek-official'));
+  assert.ok(!DEFAULT_ORDER.includes('http'));
+});
