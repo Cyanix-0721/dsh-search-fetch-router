@@ -192,6 +192,8 @@ live.
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | provider ids in enable order — used by **both** search and fetch; providers without a key are skipped at runtime. The card's reorder/disable edits this list. `deepseek-official` (search) and local `http` (fetch) are the fallbacks |
 | `keyNotes` | `{}` | per-key local notes (ref → one line), display only |
+| `verboseLog` | `false` | when on, the "which backend served this" line moves from `debug` to `info`, so it shows at the normal log level |
+| `searchProviderOrder` | unset | **legacy field, migration only**. Used when `providerOrder` is still at its default; once you change `providerOrder` (including clearing it), the new field wins. Not shown in settings |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |
