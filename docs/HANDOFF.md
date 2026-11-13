@@ -76,9 +76,9 @@
   debug 级别时看不到，这只是观测点、不影响路由。
 - 未在会话内确认 `~/.dsh/.credentials.yaml` 是否已有 `TAVILY_API_KEY` / `FIRECRAWL_API_KEY`
   （该文件被 `secret.deny-path` 拦截，agent 读不到）。缺 key 时搜索回落官方、抓取回落本地 http。
-- 本地 HTTP 回落（`HttpFetchProvider`）**成功路径没有单测**：它内部用
-  `await import('undici')` 直连网络，绕过了测试里的 `globalThis.fetch` stub，要覆盖就得
-  mock `undici` 模块，暂未做。失败/降级路径靠其余后端测试间接覆盖。
+- 本地 HTTP 回落（`HttpFetchProvider`）成功路径**已测**：`test/execute.test.js` 起一个临时
+  `node:http` server（127.0.0.1 随机端口），无 key 配置下 `router.fetch` 真实走到 `HttpFetchProvider`
+  并拿到 200 + 正文。它内部 `await import('undici')` 绕过了 `globalThis.fetch` stub，所以用真服务器而非 mock。
 
 ## 下一阶段要做的
 

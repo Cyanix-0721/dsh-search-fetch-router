@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { test } from 'node:test';
 
 import { DEEPSEEK_DEFAULT_BASE_URL } from '@deepseek-ai/dsh-web-search-deepseek';
@@ -643,4 +644,26 @@ test('search: verboseLog routes the served-by note to info instead of debug', as
   await router.search({ query: 'q' }, undefined);
   assert.ok(infoLines.some((line) => line.includes('served by fake')), infoLines.join('\n'));
   assert.equal(debugLines.length, 0);
+});
+
+test('fetch: local http fallback returns a successful result when no provider has a key', async () => {
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('local ok');
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const config = {
+      fetchFallback: true, cooldownMs: 60_000, httpTimeoutMs: 10_000, maxBodyChars: 100_000, totalBudgetMs: 45_000,
+      tavilyApiKeyRefs: [], firecrawlApiKeyRefs: [], exaApiKeyRefs: [],
+    };
+    const ctx = fakeCtx({ credentials: fakeCredentials({}) });
+    const router = createRouter(ctx, config);
+    const result = await router.fetch({ url: `http://127.0.0.1:${port}/` }, undefined);
+    assert.equal(result.statusCode, 200);
+    assert.match(result.body.content, /local ok/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
