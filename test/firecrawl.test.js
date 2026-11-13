@@ -98,6 +98,35 @@ test('map: the resolved URL prefers metadata.url, then sourceURL, then the reque
   assert.equal(fromRequest.url, 'https://requested.example.com');
 });
 
+test('map: reads the upstream failure reason from metadata.error, then warning', () => {
+  // 抓取被拦/超时时 Firecrawl 仍可能 200，把原因放在 metadata.error 或顶层 warning。
+  // 不读它的话，报错只剩一句 empty body，无法区分「页面空」和「被拦」。
+  const fromMeta = mapScrapeResponse(
+    { data: { markdown: '', metadata: { error: 'Blocked by anti-bot' } } },
+    'https://example.com',
+    { maxBodyChars: 10 },
+  );
+  assert.equal(fromMeta.failure, 'Blocked by anti-bot');
+
+  const fromWarning = mapScrapeResponse(
+    { data: { markdown: '', warning: 'timed out' , metadata: {} } },
+    'https://example.com',
+    { maxBodyChars: 10 },
+  );
+  assert.equal(fromWarning.failure, 'timed out');
+
+  const clean = mapScrapeResponse({ data: { markdown: 'x', metadata: {} } }, 'https://example.com', { maxBodyChars: 10 });
+  assert.equal(clean.failure, undefined);
+});
+
+test('build body: clamps timeout into the documented 1000..300000 range', () => {
+  // 越界上游直接 400；段预算可能很小，必须夹住。
+  const tiny = buildScrapeBody('https://example.com/a', { onlyMainContent: true, maxAgeMs: 1, timeoutMs: 10 });
+  assert.equal(tiny.timeout, 1_000);
+  const huge = buildScrapeBody('https://example.com/a', { onlyMainContent: true, maxAgeMs: 1, timeoutMs: 10_000_000 });
+  assert.equal(huge.timeout, 300_000);
+});
+
 test('map: a missing markdown field becomes an empty body', () => {
   const result = mapScrapeResponse({ data: { metadata: {} } }, 'https://example.com', { maxBodyChars: 10 });
   assert.equal(result.body.content, '');

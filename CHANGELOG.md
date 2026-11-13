@@ -25,7 +25,11 @@
   我们断连后服务端仍在爬，那次调用照样计费。Firecrawl 搜索此前已做同样处理。
 - Firecrawl 搜索的 snippet 优先取 `highlights`（与查询相关的片段）：此前优先 `description`，
   而 `description` 只在 `highlights:false` 时才有，默认响应下等于丢掉了最贴题的那段。
-- Firecrawl 搜索兼容 `data` 直接是数组的响应形态（文档同时存在 `data.web` 与 `data` 两种）。
+- Firecrawl 搜索兼容 `data` 直接是数组的响应形态（文档同时存在 `data.web` 与 `data` 两种）。- Firecrawl 抓取失败时把上游原因带进报错：抓取被拦/超时时它仍可能返回 200，把原因写在
+  `data.metadata.error` 或 `data.warning` 里。此前只报 `Firecrawl returned an empty body`，
+  与「页面确实为空」无法区分。
+- Firecrawl `/v2/scrape` 的 `timeout` 夹进文档要求的 1000–300000 范围：段预算可能远小于
+  1000ms，越界会被上游以 400 拒绝，整段抓取白跑。
 
 ## [0.1.0-alpha.0] - 2026-11-13
 
