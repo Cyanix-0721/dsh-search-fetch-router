@@ -240,6 +240,20 @@ test('search: tolerates data being a bare array as well as {web: [...]}', async 
   }
 });
 
+test('search: clamps the server-side timeout into 1000..300000 too', async () => {
+  // 搜索这条曾经直接透传段预算：段预算只剩几百毫秒时 body.timeout 会是 200，
+  // 上游回 400，看起来像「Firecrawl 挂了」，其实是我们发了非法请求。
+  const stub = stubFetch(() => Response.json({ success: true, data: { web: [] } }));
+  try {
+    await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 200 });
+    assert.equal(JSON.parse(stub.calls[0].init.body).timeout, 1_000);
+    await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 10_000_000 });
+    assert.equal(JSON.parse(stub.calls[1].init.body).timeout, 300_000);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('search: passes the server-side timeout so Firecrawl gives up before we disconnect', async () => {
   const stub = stubFetch(() => Response.json({ success: true, data: { web: [] } }));
   try {
