@@ -101,6 +101,30 @@ test('fetch registry: the Exa adapter reports an empty body as unusable, not an 
   }
 });
 
+test('fetch registry: the Exa adapter surfaces the upstream failure reason, not a bare empty body', async () => {
+  // /contents 抓不到时可能整体 200，把该 URL 放进 statuses 并给 error.tag。
+  // 若只看 results[0].text，就只会报「empty body」，把「抓不到」和「页面是空的」混为一谈。
+  const stub = stubFetch(() => Response.json({
+    results: [],
+    statuses: [{ id: 'https://example.com/a', status: 'error', error: { tag: 'CRAWL_NOT_FOUND', httpStatusCode: 404 } }],
+  }));
+  try {
+    const backend = FETCH_BACKENDS[FETCH_BACKEND_IDS.exa];
+    const outcome = await backend.run({
+      apiKey: 'exa-key',
+      request: { url: 'https://example.com/a' },
+      signal: undefined,
+      budgetMs: 5_000,
+      read: readFrom({}),
+      maxBodyChars: 100_000,
+    });
+    assert.equal(outcome.kind, 'unusable');
+    assert.match(outcome.reason, /CRAWL_NOT_FOUND/);
+  } finally {
+    stub.restore();
+  }
+});
+
 test('fetch registry: the Exa adapter truncates to maxBodyChars', async () => {
   const stub = stubFetch(() => Response.json({ results: [{ url: 'https://example.com/a', text: 'x'.repeat(50) }] }));
   try {

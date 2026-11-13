@@ -115,6 +115,8 @@ test('exa contents: posts the url and returns the first result text', async () =
     const body = JSON.parse(stub.calls[0].init.body);
     assert.deepEqual(body.urls, ['https://a.example']);
     assert.equal(body.text.maxCharacters, 5_000);
+    // 服务端也要有超时，否则我们断连了它还在爬，这次调用照样计费。
+    assert.equal(body.livecrawlTimeout, 1_000);
   } finally {
     stub.restore();
   }
@@ -125,6 +127,34 @@ test('exa contents: an empty result set yields empty content, not an error', asy
   try {
     const { content } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
     assert.equal(content, '');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: reports the upstream failure tag from statuses', async () => {
+  const stub = stubFetch(() => Response.json({
+    results: [],
+    statuses: [{ id: 'https://a.example', status: 'error', error: { tag: 'CRAWL_TIMEOUT' } }],
+  }));
+  try {
+    const { content, failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(content, '');
+    assert.equal(failure, 'CRAWL_TIMEOUT');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('exa contents: a successful status yields no failure reason', async () => {
+  const stub = stubFetch(() => Response.json({
+    results: [{ url: 'https://a.example', text: 'ok' }],
+    statuses: [{ id: 'https://a.example', status: 'success', source: 'cached' }],
+  }));
+  try {
+    const { content, failure } = await contentsExa({ apiKey: 'ek', url: 'https://a.example', timeoutMs: 1_000 });
+    assert.equal(content, 'ok');
+    assert.equal(failure, undefined);
   } finally {
     stub.restore();
   }

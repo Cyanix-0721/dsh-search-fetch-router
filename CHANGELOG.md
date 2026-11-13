@@ -9,8 +9,6 @@
 
 - 收集 `0.1.0-alpha.0` 的反馈，稳定后发布 `0.1.0`。
 
-## [Unreleased]
-
 ### Added
 
 - `exaSearchType` 配置项：Exa 搜索档位可选 `instant` / `fast` / `auto` / `deep-lite` / `deep` /
@@ -18,6 +16,16 @@
   处理，不会把未知档位发给上游（上游对未知 `type` 返回 400，会让整次搜索失败）。
 - 执行层把 `read` 传给搜索后端，后端可从配置读自己的调参项，不必为每个参数加一条
   `if (backend === ...)` 分支。
+### Fixed
+
+- Exa 抓取失败时把上游原因带进报错：`/contents` 抓不到页面时可能整体返回 200，只把该 URL
+  放进 `statuses` 并给 `error.tag`。此前只看 `results[0].text`，于是「抓不到」和「页面是空的」
+  都报成同一句 `Exa returned an empty body`，无从排查。
+- Exa `/contents` 请求体带 `livecrawlTimeout`（夹在 90000ms 内）：此前只有本地 AbortSignal，
+  我们断连后服务端仍在爬，那次调用照样计费。Firecrawl 搜索此前已做同样处理。
+- Firecrawl 搜索的 snippet 优先取 `highlights`（与查询相关的片段）：此前优先 `description`，
+  而 `description` 只在 `highlights:false` 时才有，默认响应下等于丢掉了最贴题的那段。
+- Firecrawl 搜索兼容 `data` 直接是数组的响应形态（文档同时存在 `data.web` 与 `data` 两种）。
 
 ## [0.1.0-alpha.0] - 2026-11-13
 
