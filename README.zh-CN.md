@@ -65,7 +65,7 @@
 
 ## 安装
 
-本插件只在 git 仓库分发（不发布到 npm），直接从仓库装：
+装进 DSH profile——从 npm（`dsh-search-fetch-router@alpha`）或直接从仓库：
 
 ```bash
 npx --yes @deepseek-ai/dsh plugin --profile web add \
