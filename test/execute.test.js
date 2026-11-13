@@ -587,3 +587,39 @@ test('search: an exhausted total budget yields WEB_SEARCH_BUDGET_EXHAUSTED', asy
 });
 
 
+
+test('search: legacy searchProviderOrder bridges in when providerOrder is at its default', async () => {
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run({ apiKey, request }) { calls.push({ apiKey, q: request.query }); return { sources: [{ url: 'https://fake.example/legacy' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['tavily', 'exa', 'firecrawl'], // 等于默认值
+    searchProviderOrder: ['fake'], // 旧字段，迁移应生效
+    fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/legacy');
+  assert.equal(calls.length, 1);
+});
+
+test('search: a non-default providerOrder overrides the legacy field', async () => {
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run({ apiKey, request }) { calls.push({ apiKey, q: request.query }); return { sources: [{ url: 'https://fake.example/order' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['fake'], // 非默认 → 以新字段为准
+    searchProviderOrder: ['ghost'],
+    fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000, searchFallback: false,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/order');
+  assert.equal(calls.length, 1);
+});
