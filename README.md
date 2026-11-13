@@ -148,7 +148,7 @@ If you want quota-aware scheduling, use `dsh-tavily-pool` instead.
 
 The tuning fields are exposed through the host's auto-generated settings form. On top of
 that, this plugin ships one tiny, **zero-build** browser bundle (`lib/client.js`) that adds
-an **API keys** card to its plugin page for filling the Tavily / Firecrawl secrets. An eye
+an **API keys** card to its plugin page for filling the Tavily / Brave / Firecrawl secrets. An eye
 button reveals the value you are currently typing (still unsaved); a stored secret is never
 read back. The
 card only writes to the credentials store through the host's `remote.credentials` API — it
@@ -158,16 +158,19 @@ live.
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key reference names, tried in order |
+| `braveApiKeyRefs` | `["BRAVE_API_KEY"]` | Brave key reference names (optional; put `brave` in `searchProviderOrder`) |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key reference names |
 | `tavilyExtractDepth` | `basic` | `basic` or `advanced` |
 | `minContentChars` | `0` | escalate below this length; `0` means only emptiness counts |
 | `totalBudgetMs` | `45000` | hard cap for one fetch |
 | `tavilyTimeoutMs` | `15000` | per-segment timeout |
+| `braveTimeoutMs` | `15000` | per-segment timeout (Brave) |
 | `firecrawlTimeoutMs` | `30000` | per-segment timeout |
 | `httpTimeoutMs` | `10000` | per-segment timeout |
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
 | `cooldownMs` | `60000` | how long a failed key sits out |
-| `searchProviderOrder` | `["tavily"]` | search provider ids, tried in order; `deepseek-official` is the fallback |
+| `searchTotalBudgetMs` | `30000` | hard cap for one search |
+| `searchProviderOrder` | `["tavily"]` | search provider ids, tried in order (`tavily` built-in, `brave` optional); `deepseek-official` is the fallback |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |
@@ -180,6 +183,7 @@ Failures carry a stable `code`, surfaced in the tool's structured error metadata
 | Code | When |
 | --- | --- |
 | `WEB_SEARCH_ALL_PROVIDERS_FAILED` | every search backend failed |
+| `WEB_SEARCH_BUDGET_EXHAUSTED` | the search budget ran out before any backend finished |
 | `WEB_FETCH_ALL_PROVIDERS_FAILED` | every fetch backend failed |
 | `WEB_FETCH_BUDGET_EXHAUSTED` | the budget ran out before any backend finished |
 | `WEB_INVALID_URL` | bad, over-long, non-http(s), or credential-bearing URL |

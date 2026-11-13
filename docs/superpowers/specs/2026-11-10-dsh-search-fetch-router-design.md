@@ -81,6 +81,9 @@ searchProviderOrder: [ tavily, … ] ──(all keys failed)──> deepseek-off
 rather than re-registering its settings namespace — that namespace belongs to the host and
 cannot be installed twice.
 
+Built-in search providers are `tavily` and `brave` (both keyed; `brave` is opt-in via
+`searchProviderOrder`), with `deepseek-official` as the keyless fallback.
+
 #### Adding a search provider
 
 1. Register it in `lib/search-backends.js` — `run(args)`. A keyed backend receives
@@ -236,7 +239,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 100 tests.
+`node --test`, no framework, no build step. 112 tests.
 
 - `test/router.test.js` — data-driven search chain order (`searchProviderOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.

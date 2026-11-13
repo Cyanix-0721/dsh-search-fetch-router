@@ -556,4 +556,33 @@ test('search: debug log records which backend served the request', async () => {
   assert.ok(debugLines.some((line) => line.includes('served by fake')), debugLines.join('\n'));
 });
 
+test('search: brave is used when listed in searchProviderOrder', async () => {
+  const stub = stubFetch((url) => {
+    if (url.includes('api.search.brave.com')) {
+      return Response.json({ web: { results: [{ title: 'B', url: 'https://b.example', description: 'd' }] } });
+    }
+    throw new Error(`unexpected ${url}`);
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ BRAVE_API_KEY: 'bk' }) });
+    const router = createRouter(ctx, configWith({ searchProviderOrder: ['brave'] }));
+    const result = await router.search({ query: 'hello' }, undefined);
+    assert.equal(result.sources[0].url, 'https://b.example');
+    assert.equal(stub.calls.length, 1);
+    assert.match(stub.calls[0].url, /api\.search\.brave\.com\/res\/v1\/web\/search/);
+    assert.equal(stub.calls[0].init.headers['x-subscription-token'], 'bk');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: an exhausted total budget yields WEB_SEARCH_BUDGET_EXHAUSTED', async () => {
+  const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+  const router = createRouter(ctx, configWith({ searchTotalBudgetMs: 1 }));
+  await assert.rejects(
+    router.search({ query: 'q' }, undefined),
+    (error) => error.code === 'WEB_SEARCH_BUDGET_EXHAUSTED',
+  );
+});
+
 

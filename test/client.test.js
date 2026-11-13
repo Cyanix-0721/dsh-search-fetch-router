@@ -211,12 +211,12 @@ test('client: the card renders a field per configured reference', () => {
   const tree = element.type(element.props);
   assert.equal(tree.type, 'div');
   const children = tree.children.flat(Infinity).filter(Boolean);
-  // title, description, tavily group, firecrawl group, note
-  assert.equal(children.length, 5);
+  // title, description, tavily group, firecrawl group, brave group, note
+  assert.equal(children.length, 6);
 
   const inputs = collectKeyInputs(tree);
   const labels = inputs.map((field) => field.props['data-sfr-key']).sort();
-  assert.deepEqual(labels, ['FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
+  assert.deepEqual(labels, ['BRAVE_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY', 'TAVILY_API_KEY_2']);
   // Nothing is being typed yet, so no field should be revealed and no eye button exists.
   assert.ok(inputs.every((field) => field.props.type === 'password'));
   // A group with more than one reference gets a per-row remove button; a single-row
@@ -239,7 +239,7 @@ test('client: falls back to the default reference names on a loading snapshot', 
   const inputs = collectKeyInputs(tree);
   assert.deepEqual(
     inputs.map((field) => field.props['data-sfr-key']).sort(),
-    ['FIRECRAWL_API_KEY', 'TAVILY_API_KEY'],
+    ['BRAVE_API_KEY', 'FIRECRAWL_API_KEY', 'TAVILY_API_KEY'],
   );
 });
 
@@ -324,7 +324,7 @@ test('client: the add button appends a reference name through form.mutate', asyn
   const tree = element.type(element.props);
 
   const addButtons = collectAddButtons(tree);
-  assert.equal(addButtons.length, 2, 'one add button per group');
+  assert.equal(addButtons.length, 3, 'one add button per group');
   assert.equal(addButtons[0].props.disabled, false);
 
   await addButtons[0].props.onClick();
@@ -336,6 +336,12 @@ test('client: the add button appends a reference name through form.mutate', asyn
   await addButtons[1].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
     { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
+  ]);
+
+  // The third target the brave array.
+  await addButtons[2].props.onClick();
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'set', path: ['braveApiKeyRefs', 1], value: 'BRAVE_API_KEY_2' },
   ]);
 });
 
@@ -374,7 +380,7 @@ test('client: add is disabled when the form cannot mutate', () => {
   const tree = element.type(element.props);
 
   const addButtons = collectAddButtons(tree);
-  assert.equal(addButtons.length, 2);
+  assert.equal(addButtons.length, 3);
   assert.ok(addButtons.every((button) => button.props.disabled === true));
   // Default config has one ref per group, so no remove buttons either.
   assert.equal(collectButtons(tree).length, 0);

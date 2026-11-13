@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 101 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 112 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
@@ -40,7 +40,7 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
 
 **已验证**
 
-- `npm test` → 101 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 112 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
@@ -51,6 +51,7 @@ Firecrawl 只在两种情况下被调用：Tavily 报错、Tavily 没拿到可�
   client `RouterSettingsCard` 的密钥分组改由 `KEY_GROUPS` 驱动（行为不变，11 个 client 测试仍过）。
 - 抓取后端同样是数据驱动的（`lib/fetch-backends.js` + `test/fetch-backends.test.js` 契约测试）：
   `lib/execute.js` 的 fetch 循环已无 `if (backend === ...)` 分支，与重构前逐字对齐（既有降级路径测试全过）。
+- 新增可选的 Brave 搜索供应商（keyed，`lib/brave.js`，注册进 `SEARCH_BACKENDS`）；`execute.search` 加了与抓取对称的总预算 `searchTotalBudgetMs`，耗尽抛 `WEB_SEARCH_BUDGET_EXHAUSTED`。
 - 执行层的「后端归属」有 debug 日志（`note()`），并有测试锁住（`test/execute.test.js` 断言 debug 行含 `served by fake`）。
 - CI 的依赖装法在本地复现过：`@deepseek-ai/*@next`（当前 `0.2.2-rc.1`）+
   `@deepseek-ai/schemastery@latest`，22 包，装完测试仍全过。
