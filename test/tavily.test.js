@@ -161,3 +161,54 @@ test('extract: the request carries exactly one url', async () => {
     stub.restore();
   }
 });
+
+test('extract: the local budget is forwarded as a server-side timeout in seconds', async () => {
+  const stub = stubFetch(() => Response.json({ results: [{ raw_content: 'x' }], failed_results: [] }));
+  try {
+    await extractTavily({ apiKey: 'k', url: 'https://example.com', depth: 'basic', signal: undefined, timeoutMs: 12_500 });
+    assert.equal(JSON.parse(stub.calls[0].init.body).timeout, 12);
+
+    // 官方范围是 1.0–60.0，越界会被 400 拒；所以夹取而不是原样透传。
+    await extractTavily({ apiKey: 'k', url: 'https://example.com', depth: 'basic', signal: undefined, timeoutMs: 120_000 });
+    assert.equal(JSON.parse(stub.calls[1].init.body).timeout, 60);
+
+    await extractTavily({ apiKey: 'k', url: 'https://example.com', depth: 'basic', signal: undefined, timeoutMs: 200 });
+    assert.equal(JSON.parse(stub.calls[2].init.body).timeout, 1);
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a 429 carries the Retry-After header so the ring can honour it', async () => {
+  const stub = stubFetch(() => new Response('slow down', {
+    status: 429,
+    headers: { 'retry-after': '90' },
+  }));
+  try {
+    await assert.rejects(
+      () => extractTavily({ apiKey: 'k', url: 'https://example.com', depth: 'basic', ...options }),
+      (error) => {
+        assert.equal(error.status, 429);
+        assert.equal(error.retryAfterMs, 90_000);
+        return true;
+      },
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a response without Retry-After leaves the hint unset', async () => {
+  const stub = stubFetch(() => new Response('boom', { status: 500 }));
+  try {
+    await assert.rejects(
+      () => searchTavily({ apiKey: 'k', query: 'q', ...options }),
+      (error) => {
+        assert.equal('retryAfterMs' in error, false);
+        return true;
+      },
+    );
+  } finally {
+    stub.restore();
+  }
+});

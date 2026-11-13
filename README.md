@@ -148,6 +148,14 @@ not hammer one key. A key that fails cools down for `cooldownMs` (default 60 s) 
 skipped while cooling. A key that fails with 401/403 **and** an explicit "invalid /
 revoked / expired" message is marked dead for the rest of the process.
 
+The cooldown length depends on the failure, not just on `cooldownMs`:
+
+- `Retry-After` from upstream (Tavily sends it on 429) → use it, capped at one day.
+- Quota exhausted (Tavily 432 / 433: key, plan, or pay-as-you-go limit) → 60× cooldown,
+  and the key is **not** marked dead: the key is fine, it just has no budget this cycle.
+- Rate limited (429 or "rate limit" wording) → 5× cooldown.
+- Anything else → 1× cooldown.
+
 Pool state lives across calls — cursor, cooldowns, and the dead set all belong to the plugin
 instance. Editing the reference list or the cooldown in the settings form rebuilds the pool,
 because a changed configuration deserves a clean start.

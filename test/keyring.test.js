@@ -119,3 +119,27 @@ test('ring: rate-limit wording without a 429 also cools longer', async () => {
   keyring.penalize('A', { message: 'Too Many Requests' }, 0);
   assert.equal(keyring.cooldowns.get('A'), 5_000);
 });
+
+test('ring: an exhausted quota cools the key far longer than a rate limit', async () => {
+  const quota = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  assert.equal(quota.penalize('A', { status: 432, message: 'plan limit exceeded' }, 0), 'quota');
+  assert.equal(quota.cooldowns.get('A'), 60_000);
+  // 额度耗尽不是 key 失效：这把 key 之后还可能恢复，所以不能进 dead。
+  assert.equal(quota.dead.has('A'), false);
+
+  const paygo = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  paygo.penalize('A', { status: 433, message: 'paygo limit' }, 0);
+  assert.equal(paygo.cooldowns.get('A'), 60_000);
+});
+
+test('ring: Retry-After overrides the built-in cooldown', async () => {
+  const keyring = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  keyring.penalize('A', { status: 429, message: 'slow down', retryAfterMs: 45_000 }, 0);
+  assert.equal(keyring.cooldowns.get('A'), 45_000);
+});
+
+test('ring: an absurd Retry-After is capped at a day', async () => {
+  const keyring = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  keyring.penalize('A', { status: 429, message: 'slow down', retryAfterMs: 30 * 24 * 60 * 60 * 1000 }, 0);
+  assert.equal(keyring.cooldowns.get('A'), 24 * 60 * 60 * 1000);
+});

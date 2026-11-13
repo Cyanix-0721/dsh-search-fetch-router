@@ -25,11 +25,18 @@
   我们断连后服务端仍在爬，那次调用照样计费。Firecrawl 搜索此前已做同样处理。
 - Firecrawl 搜索的 snippet 优先取 `highlights`（与查询相关的片段）：此前优先 `description`，
   而 `description` 只在 `highlights:false` 时才有，默认响应下等于丢掉了最贴题的那段。
-- Firecrawl 搜索兼容 `data` 直接是数组的响应形态（文档同时存在 `data.web` 与 `data` 两种）。- Firecrawl 抓取失败时把上游原因带进报错：抓取被拦/超时时它仍可能返回 200，把原因写在
+- Firecrawl 搜索兼容 `data` 直接是数组的响应形态（文档同时存在 `data.web` 与 `data` 两种）。
+- Firecrawl 抓取失败时把上游原因带进报错：抓取被拦/超时时它仍可能返回 200，把原因写在
   `data.metadata.error` 或 `data.warning` 里。此前只报 `Firecrawl returned an empty body`，
   与「页面确实为空」无法区分。
 - Firecrawl `/v2/scrape` 的 `timeout` 夹进文档要求的 1000–300000 范围：段预算可能远小于
   1000ms，越界会被上游以 400 拒绝，整段抓取白跑。
+- Tavily `/extract` 请求体带服务端 `timeout`（秒，夹在官方 1–60 内）：此前只有本地 AbortSignal，
+  我们断连后服务端仍会把抽取跑完，那次调用照样计费。
+- Tavily 的 429 现在会读 `Retry-After` 头：不同限流规则的等待时长不同，用固定冷却不是太久就是太短。
+- Tavily 的 432 / 433（key 限额、套餐限额、PayGo 限额）单独归类为「额度耗尽」，冷却放大 60×
+  且不把 key 标成永久失效：此前它们和普通失败一样只冷却 1×，整条链会每隔一分钟去撞一次注定
+  失败的请求。
 
 ## [0.1.0-alpha.0] - 2026-11-13
 
