@@ -829,3 +829,25 @@ test('fetch: a keyless backend reporting unusable hands over instead of returnin
   const result = await router.fetch({ url: 'https://fake.example/k' }, undefined);
   assert.equal(result.body.content, 'fallback body');
 });
+
+test('search: an explicitly emptied providerOrder is not resurrected by the legacy field', async () => {
+  // schema 默认值是三项，所以空数组只可能来自用户把供应商全部停用。
+  // 此时旧字段不能把它救回来——否则「全部停用」重启后又变成旧顺序。
+  const config = {
+    providerOrder: [], // 用户全部停用
+    searchProviderOrder: ['fake'], // 旧字段仍有值
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run() { calls.push('fake'); return { sources: [{ url: 'https://fake.example/x' }], truncated: false }; },
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  await assert.rejects(() => router.search({ query: 'q' }, undefined), /no web search provider is usable/);
+  assert.deepEqual(calls, [], 'a disabled provider must not be used');
+});
