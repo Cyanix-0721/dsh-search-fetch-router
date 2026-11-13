@@ -18,6 +18,14 @@
   `if (backend === ...)` 分支。
 ### Fixed
 
+- 抓取的 keyless 后端也会问 `isAvailable()`，与搜索对齐：此前对无 key 后端一律当作可用，
+  一个自报不可用的后端仍会被调用，拿到的失败和「它本来就没准备好」是两回事。
+- keyless 抓取后端返回 `unusable` 时换下一家，而不是把 `undefined` 当结果返回给工具层：
+  此前那条路径会把 undefined 一路带出去，最后在更远处炸，错误信息对不上真正原因。
+- 显式清空的 `providerOrder` 不再被旧字段 `searchProviderOrder` 复活：空数组只可能是用户
+  主动全部停用（schema 默认是三家），此前重启后旧字段又把顺序救回来。
+- Exa `/contents` 的失败原因按 `url` 匹配 `statuses`：上游按请求里的 urls 回填，别人的失败
+  条目可能排在前面，按位置取会把无关的失败安到本次请求头上。
 - Exa 抓取失败时把上游原因带进报错：`/contents` 抓不到页面时可能整体返回 200，只把该 URL
   放进 `statuses` 并给 `error.tag`。此前只看 `results[0].text`，于是「抓不到」和「页面是空的」
   都报成同一句 `Exa returned an empty body`，无从排查。
