@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { FETCH_BACKENDS, FETCH_BACKEND_IDS, lookupFetchBackend } from '../lib/fetch-backends.js';
+import {
+  crossOriginTarget,
+  FETCH_BACKENDS,
+  FETCH_BACKEND_IDS,
+  fetchFollowingCrossOrigin,
+  lookupFetchBackend,
+} from '../lib/fetch-backends.js';
 import { FETCH_BACKENDS as ROUTER_FETCH_BACKENDS } from '../lib/router.js';
 
 test('fetch registry: keys match the router constants exactly', () => {
@@ -166,4 +172,64 @@ test('fetch registry: the Exa adapter lets an HTTP failure throw so the key is r
   } finally {
     stub.restore();
   }
+});
+
+/** 构造宿主的跨域重定向错误（形状与 dsh-web-fetch-http 抛的一致）。 */
+function redirectBlocked(target) {
+  const error = new Error(
+    `cross-origin redirect to ${target} is not followed automatically; retry against that URL directly`,
+  );
+  error.code = 'WEB_REDIRECT_BLOCKED';
+  return error;
+}
+
+test('cross-origin redirect: target is read out of the host error', () => {
+  assert.equal(crossOriginTarget(redirectBlocked('https://exa.ai')), 'https://exa.ai');
+  assert.equal(crossOriginTarget(new Error('boom')), undefined);
+  assert.equal(crossOriginTarget({ code: 'WEB_PROVIDER_ERROR', message: 'x' }), undefined);
+});
+
+test('cross-origin redirect: follows the hop once and returns the second result', async () => {
+  // 实测场景：docs.exa.ai 跳到 exa.ai，宿主拒绝跨域跟随，整次抓取被判失败。
+  const seen = [];
+  const provider = {
+    async fetch(request) {
+      seen.push(request.url);
+      if (request.url === 'https://docs.exa.ai/x') throw redirectBlocked('https://exa.ai');
+      return { url: request.url, statusCode: 200, body: { kind: 'text', content: 'ok' }, truncated: false };
+    },
+  };
+  const result = await fetchFollowingCrossOrigin(provider, { url: 'https://docs.exa.ai/x' }, undefined);
+  assert.deepEqual(seen, ['https://docs.exa.ai/x', 'https://exa.ai']);
+  assert.equal(result.body.content, 'ok');
+});
+
+test('cross-origin redirect: gives up instead of looping on a cycle', async () => {
+  let calls = 0;
+  const provider = {
+    async fetch(request) {
+      calls += 1;
+      throw redirectBlocked(request.url === 'https://a.test/' ? 'https://b.test/' : 'https://a.test/');
+    },
+  };
+  await assert.rejects(
+    () => fetchFollowingCrossOrigin(provider, { url: 'https://a.test/' }, undefined),
+    (error) => {
+      assert.equal(error.code, 'WEB_REDIRECT_BLOCKED');
+      return true;
+    },
+  );
+  assert.equal(calls, 2, 'one hop each way, then the cycle is refused');
+});
+
+test('cross-origin redirect: other failures are rethrown untouched', async () => {
+  const boom = new Error('ECONNREFUSED');
+  const provider = { async fetch() { throw boom; } };
+  await assert.rejects(
+    () => fetchFollowingCrossOrigin(provider, { url: 'https://a.test/' }, undefined),
+    (error) => {
+      assert.equal(error, boom);
+      return true;
+    },
+  );
 });
