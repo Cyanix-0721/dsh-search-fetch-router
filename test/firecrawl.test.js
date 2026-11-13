@@ -172,3 +172,51 @@ test('search: a non-2xx response throws with the HTTP status', async () => {
     stub.restore();
   }
 });
+
+test('search: prefers highlights over description, because that is what the API returns by default', async () => {
+  const stub = stubFetch(() => Response.json({
+    success: true,
+    data: {
+      web: [
+        {
+          title: 'Alpha',
+          url: 'https://a.example',
+          description: 'plain description',
+          highlights: ['query-relevant passage'],
+        },
+      ],
+    },
+  }));
+  try {
+    const result = await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 1_000 });
+    // 默认响应带 highlights；description 只在 highlights:false 时才有，优先级必须反过来。
+    assert.equal(result.sources[0].snippet, 'query-relevant passage');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: tolerates data being a bare array as well as {web: [...]}', async () => {
+  const stub = stubFetch(() => Response.json({
+    success: true,
+    data: [{ title: 'Alpha', url: 'https://a.example', description: 'first' }],
+  }));
+  try {
+    const result = await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 1_000 });
+    // 两种形状都认：一次 API 形状变化不该把整条搜索链打空。
+    assert.equal(result.sources.length, 1);
+    assert.equal(result.sources[0].url, 'https://a.example');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('search: passes the server-side timeout so Firecrawl gives up before we disconnect', async () => {
+  const stub = stubFetch(() => Response.json({ success: true, data: { web: [] } }));
+  try {
+    await searchFirecrawl({ apiKey: 'fc-key', query: 'q', timeoutMs: 7_000 });
+    assert.equal(JSON.parse(stub.calls[0].init.body).timeout, 7_000);
+  } finally {
+    stub.restore();
+  }
+});
