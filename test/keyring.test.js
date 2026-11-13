@@ -103,3 +103,19 @@ test('ring: a zero or negative cooldown falls back to the default', async () => 
   keyring.penalize('A', { status: 500, message: 'boom' }, 0);
   assert.deepEqual(keyring.candidates(30_000), []);
 });
+
+test('ring: a 429 cools the key down five times longer than a normal failure', async () => {
+  const rateLimited = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  rateLimited.penalize('A', { status: 429, message: 'slow down' }, 0);
+  assert.equal(rateLimited.cooldowns.get('A'), 5_000);
+
+  const plain = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  plain.penalize('A', { status: 500, message: 'boom' }, 0);
+  assert.equal(plain.cooldowns.get('A'), 1_000);
+});
+
+test('ring: rate-limit wording without a 429 also cools longer', async () => {
+  const keyring = ring(['A'], async () => 'v', { cooldownMs: 1_000 });
+  keyring.penalize('A', { message: 'Too Many Requests' }, 0);
+  assert.equal(keyring.cooldowns.get('A'), 5_000);
+});
