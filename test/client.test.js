@@ -97,7 +97,10 @@ function fakeContext(configValue, options = {}) {
         describe: async (refs) => ({
           ok: true,
           value: Object.fromEntries(
-            refs.map((reference) => [reference, { configured: true, writable: true }]),
+            refs.map((reference) => [
+              reference,
+              { configured: true, writable: true, ...(options.masked ? { masked: options.masked } : {}) },
+            ]),
           ),
         }),
         set: async () => ({ ok: true }),
@@ -221,9 +224,8 @@ test('client: the card renders a field per configured reference', () => {
   assert.ok(inputs.every((field) => field.props.type === 'password'));
   // A group with more than one reference gets a per-row remove button; a single-row
   // group must not — you can never delete your last account.
-  const removeButtons = collectButtons(tree);
+  const removeButtons = collectButtons(tree).filter((button) => button.props['aria-label'] === 'Remove');
   assert.equal(removeButtons.length, 2);
-  assert.ok(removeButtons.every((button) => button.props['aria-label'] === 'Remove'));
 });
 
 test('client: falls back to the default reference names on a loading snapshot', () => {
@@ -332,16 +334,16 @@ test('client: the add button appends a reference name through form.mutate', asyn
     { op: 'set', path: ['tavilyApiKeyRefs', 1], value: 'TAVILY_API_KEY_2' },
   ]);
 
-  // The second add button targets the firecrawl array independently.
+  // The second add button targets the exa array (search providers render before fetch).
   await addButtons[1].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
+    { op: 'set', path: ['exaApiKeyRefs', 1], value: 'EXA_API_KEY_2' },
   ]);
 
-  // The third target the exa array.
+  // The third targets the firecrawl array independently.
   await addButtons[2].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['exaApiKeyRefs', 1], value: 'EXA_API_KEY_2' },
+    { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
   ]);
 });
 
@@ -359,7 +361,7 @@ test('client: a remove button unsets that reference', async () => {
   });
   const tree = element.type(element.props);
 
-  const removeButtons = collectButtons(tree);
+  const removeButtons = collectButtons(tree).filter((button) => button.props['aria-label'] === 'Remove');
   assert.equal(removeButtons.length, 2, 'only the two-row group gets remove buttons');
 
   await removeButtons[0].props.onClick();
@@ -382,6 +384,84 @@ test('client: add is disabled when the form cannot mutate', () => {
   const addButtons = collectAddButtons(tree);
   assert.equal(addButtons.length, 3);
   assert.ok(addButtons.every((button) => button.props.disabled === true));
-  // Default config has one ref per group, so no remove buttons either.
-  assert.equal(collectButtons(tree).length, 0);
+  // Default config has one ref per group, so no remove buttons either
+  // (header ordering/enable buttons carry aria-labels too, so filter for Remove).
+  assert.equal(
+    collectButtons(tree).filter((button) => button.props['aria-label'] === 'Remove').length,
+    0,
+  );
+});
+
+test('client: disabling a search provider removes it from searchProviderOrder', async () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations, state } = fakeContext({
+    tavilyApiKeyRefs: ['TAVILY_API_KEY'],
+    exaApiKeyRefs: ['EXA_API_KEY'],
+    firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
+    searchProviderOrder: ['tavily', 'exa'],
+  });
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({ subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } } });
+  const tree = element.type(element.props);
+
+  // Both providers are enabled → two "Disable" buttons, in tavily-then-exa order.
+  const disableButtons = collectButtons(tree).filter((b) => b.props['aria-label'] === 'Disable');
+  assert.equal(disableButtons.length, 2);
+  await disableButtons[1].props.onClick(); // exa
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'set', path: ['searchProviderOrder'], value: ['tavily'] },
+  ]);
+});
+
+test('client: move down reorders searchProviderOrder', async () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { ctx, registrations, state } = fakeContext({
+    tavilyApiKeyRefs: ['TAVILY_API_KEY'],
+    exaApiKeyRefs: ['EXA_API_KEY'],
+    firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
+    searchProviderOrder: ['tavily', 'exa'],
+  });
+  exported.apply(ctx);
+  const { Component } = registrations[0];
+  const element = Component({ subject: { kind: 'bundle', pkg: { name: 'dsh-search-fetch-router' } } });
+  const tree = element.type(element.props);
+
+  // First enabled provider (tavily) can move down; its button is the first enabled "Move down".
+  const downButtons = collectButtons(tree).filter((b) => b.props['aria-label'] === 'Move down' && b.props.disabled !== true);
+  assert.equal(downButtons.length, 1);
+  await downButtons[0].props.onClick();
+  assert.deepEqual(state.mutations.at(-1), [
+    { op: 'set', path: ['searchProviderOrder'], value: ['exa', 'tavily'] },
+  ]);
+});
+
+test('client: KeyField shows the masked preview and a note input', () => {
+  const { captured, require } = loadBundle();
+  const exported = captured.factory(require);
+  const { KeyField } = exported.__test;
+  const t = (key) => key;
+  const node = KeyField({
+    t,
+    reference: 'TAVILY_API_KEY',
+    status: { configured: true, writable: true, busy: false, masked: '••••abcd' },
+    draft: '',
+    note: 'work account',
+    onEdit: () => {},
+    onSave: () => {},
+    onNoteCommit: () => {},
+  });
+
+  const spans = flatten(node).filter((n) => n.type === 'span');
+  assert.ok(
+    spans.some((span) => [].concat(span.children).join('').includes('••••abcd')),
+    'masked preview rendered in the badge',
+  );
+  const noteInputs = flatten(node).filter(
+    (n) => n.type === 'input' && n.props?.['data-sfr-note'] !== undefined,
+  );
+  assert.equal(noteInputs.length, 1);
+  assert.equal(noteInputs[0].props.defaultValue, 'work account');
 });

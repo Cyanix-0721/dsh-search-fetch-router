@@ -10,8 +10,10 @@ environment) and the plugin only ever holds a reference name.
 
 ## Routing
 
-**Search** — the provider order in `searchProviderOrder` (a Tavily key pool by default),
-optionally falling back to the host's `deepseek-official` provider.
+**Search** — the provider order in `searchProviderOrder` (default `["tavily", "exa"]`;
+providers without a key are skipped at runtime), optionally falling back to the host's
+`deepseek-official` provider. The plugin-page key card lets you reorder, disable, and add a
+note to each search provider, and shows a masked preview of each stored key.
 
 **Fetch** — one fixed chain: Tavily `/extract` → Firecrawl `/v2/scrape` → local `http`.
 
@@ -158,7 +160,7 @@ live.
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key reference names, tried in order |
-| `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key reference names (optional; put `exa` in `searchProviderOrder`) |
+| `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key reference names (enabled by default; a set key joins the chain, disable in the card) |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key reference names |
 | `tavilyExtractDepth` | `basic` | `basic` or `advanced` |
 | `minContentChars` | `0` | escalate below this length; `0` means only emptiness counts |
@@ -170,7 +172,8 @@ live.
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
-| `searchProviderOrder` | `["tavily"]` | search provider ids, tried in order (`tavily` built-in, `exa` optional); `deepseek-official` is the fallback |
+| `searchProviderOrder` | `["tavily", "exa"]` | search provider ids = enable order; keyless ones are skipped at runtime. The card's reorder/disable edits this list; `deepseek-official` is the fallback |
+| `keyNotes` | `{}` | per-key local notes (ref → one line), display only |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |

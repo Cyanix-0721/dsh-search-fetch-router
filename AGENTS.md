@@ -6,7 +6,7 @@
 
 一个 DSH（DeepSeek Harness）插件，接管 `ctx.web` 的搜索与抓取两条能力，路由顺序：
 
-- **搜索**：按 `searchProviderOrder`（内置 `tavily` key 池、可选 `exa`）→ 可回落 DSH 官方 `deepseek-official`（走 magpie 网关）
+- **搜索**：按 `searchProviderOrder`（默认 `tavily`、`exa`，没配 key 的运行时自动跳过；插件页卡片可排序/停用）→ 可回落 DSH 官方 `deepseek-official`（走 magpie 网关）
 - **抓取**：固定顺序 Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`
 
 高级抓取（整站爬、反爬、结构化抽取）不归本插件管，交给 firecrawl MCP。
@@ -62,7 +62,7 @@ lib/firecrawl.js      /v2/scrape 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
 lib/execute.js        执行层：把决策落到调用上，失败降级
-lib/client.js         零构建浏览器设置卡：填 Tavily / Firecrawl 的 key（写 credentials），可加/删多账号
+lib/client.js         零构建浏览器设置卡：填 key（写 credentials），搜索供应商可排序/停用/写备注，显示 key 掩码；可加/删多账号
 test/*.test.js        node --test，无框架依赖
 ```
 

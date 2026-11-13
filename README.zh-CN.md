@@ -9,7 +9,7 @@
 
 ## 路由
 
-**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 Tavily key 池），最后可回落宿主的 `deepseek-official`。
+**搜索** —— 按 `searchProviderOrder` 配置的供应商顺序（默认 `["tavily", "exa"]`，没配 key 的供应商运行时自动跳过），最后可回落宿主的 `deepseek-official`。插件页的密钥卡片可对搜索供应商排序、停用、写备注，并显示已保存 key 的掩码预览。
 
 **抓取** —— 固定一条链：Tavily `/extract` → Firecrawl `/v2/scrape` → 本地 `http`。
 
@@ -137,7 +137,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | 字段 | 默认 | 含义 |
 | --- | --- | --- |
 | `tavilyApiKeyRefs` | `["TAVILY_API_KEY"]` | Tavily key 引用名，按序尝试 |
-| `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key 引用名（可选，需把 `exa` 填进 `searchProviderOrder`） |
+| `exaApiKeyRefs` | `["EXA_API_KEY"]` | Exa key 引用名（默认已启用；填了 key 就进链，可在插件页停用） |
 | `firecrawlApiKeyRefs` | `["FIRECRAWL_API_KEY"]` | Firecrawl key 引用名 |
 | `tavilyExtractDepth` | `basic` | `basic` 或 `advanced` |
 | `minContentChars` | `0` | 短于此长度就升级；`0` 表示只判空 |
@@ -149,7 +149,8 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `maxBodyChars` | `100000` | 返回正文的截断点 |
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
-| `searchProviderOrder` | `["tavily"]` | 搜索供应商尝试顺序，按 id（内置 `tavily`、可选 `exa`）；官方 `deepseek-official` 作兜底 |
+| `searchProviderOrder` | `["tavily", "exa"]` | 搜索供应商尝试顺序 = 启用顺序；没配 key 的运行时跳过。插件页的排序/停用改的就是它；官方 `deepseek-official` 作兜底 |
+| `keyNotes` | `{}` | 每把 key 的本机备注（ref→一句话），只展示不参与请求 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |
