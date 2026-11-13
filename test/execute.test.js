@@ -623,3 +623,24 @@ test('search: a non-default providerOrder overrides the legacy field', async () 
   assert.equal(result.sources[0].url, 'https://fake.example/order');
   assert.equal(calls.length, 1);
 });
+
+test('search: verboseLog routes the served-by note to info instead of debug', async () => {
+  const infoLines = [];
+  const debugLines = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run() { return { sources: [{ url: 'https://fake.example/v' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['fake'], fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000,
+    searchFallback: false, verboseLog: true,
+  };
+  const ctx = fakeCtx({
+    credentials: fakeCredentials({ FAKE_KEY: 'fk' }),
+    logger: { warn() {}, info: (m) => infoLines.push(m), debug: (m) => debugLines.push(m) },
+  });
+  const router = createRouter(ctx, config, { searchBackends: { fake: fakeBackend } });
+  await router.search({ query: 'q' }, undefined);
+  assert.ok(infoLines.some((line) => line.includes('served by fake')), infoLines.join('\n'));
+  assert.equal(debugLines.length, 0);
+});
