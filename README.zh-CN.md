@@ -59,6 +59,8 @@
 2. `lib/config.js` 加 key refs 数组与单次超时字段（都要 `.volatile()`）。
 3. 如果它也要做搜索，在 `lib/search-backends.js` 用同一个 id 注册一个搜索适配器；否则只出现在抓取链里。
 4. 用户把它的 id 填进 `providerOrder`。
+5. 测试可用 `createRouter(ctx, config, {fetchBackends: {...}})` 注入注册表（与搜索侧的
+   `searchBackends` 对称），不改生产代码即可验证「新增供应商即被采用」。
 
 **边界**：整站爬、反爬、结构化抽取、批量任务**不属于本插件**，交给 firecrawl MCP。
 本插件只是单 URL `web_fetch` 的一条路由。`lib/execute.js` 与 `lib/router.js` 都不用改。

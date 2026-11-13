@@ -73,6 +73,10 @@ Fetch backends are **declaratively registered** in `lib/fetch-backends.js` and s
    `lib/search-backends.js`; otherwise it only appears in the fetch chain.
 4. Have the user put its `id` into `providerOrder`.
 
+5. Tests can inject a registry via `createRouter(ctx, config, {fetchBackends: {...}})` —
+   same as the search side's `searchBackends` — to prove a new provider is picked up without
+   touching production code.
+
 **Boundary:** whole-site crawling, anti-bot handling, structured extraction and batch jobs do
 **not** belong here — they go to the firecrawl MCP. This plugin only routes a single-URL
 `web_fetch`. `lib/execute.js` and `lib/router.js` need no change.

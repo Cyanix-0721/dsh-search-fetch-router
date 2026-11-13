@@ -675,3 +675,90 @@ test('fetch: local http fallback returns a successful result when no provider ha
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('fetch: a newly registered backend is picked up via providerOrder with no code branch', async () => {
+  const calls = [];
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ apiKey, request }) {
+      calls.push({ apiKey, url: request.url });
+      return {
+        kind: 'result',
+        result: {
+          url: request.url,
+          statusCode: 200,
+          body: { kind: 'text', content: 'from fake backend' },
+          truncated: false,
+        },
+      };
+    },
+  };
+  const config = {
+    providerOrder: ['fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    fetchFallback: false,
+    maxBodyChars: 100_000,
+    totalBudgetMs: 45_000,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { fetchBackends: { fake: fakeBackend } });
+  const result = await router.fetch({ url: 'https://fake.example/x' }, undefined);
+  assert.equal(result.body.content, 'from fake backend');
+  assert.deepEqual(calls, [{ apiKey: 'fk', url: 'https://fake.example/x' }]);
+});
+
+test('fetch: a backend returning unusable hands over to the next one without penalizing its key', async () => {
+  const seen = [];
+  const emptyBackend = {
+    id: 'empty',
+    label: 'Empty',
+    keyRefsField: 'emptyApiKeyRefs',
+    timeoutField: 'emptyTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run() {
+      seen.push('empty');
+      return { kind: 'unusable', reason: 'nothing here' };
+    },
+  };
+  const goodBackend = {
+    id: 'good',
+    label: 'Good',
+    keyRefsField: 'goodApiKeyRefs',
+    timeoutField: 'goodTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run({ request }) {
+      seen.push('good');
+      return {
+        kind: 'result',
+        result: {
+          url: request.url,
+          statusCode: 200,
+          body: { kind: 'text', content: 'second time lucky' },
+          truncated: false,
+        },
+      };
+    },
+  };
+  const config = {
+    providerOrder: ['empty', 'good'],
+    emptyApiKeyRefs: ['EMPTY_KEY'],
+    goodApiKeyRefs: ['GOOD_KEY'],
+    emptyTimeoutMs: 5_000,
+    goodTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    fetchFallback: false,
+    maxBodyChars: 100_000,
+    totalBudgetMs: 45_000,
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ EMPTY_KEY: 'e', GOOD_KEY: 'g' }) });
+  const router = createRouter(ctx, config, { fetchBackends: { empty: emptyBackend, good: goodBackend } });
+  const result = await router.fetch({ url: 'https://fake.example/y' }, undefined);
+  assert.equal(result.body.content, 'second time lucky');
+  assert.deepEqual(seen, ['empty', 'good']);
+});
