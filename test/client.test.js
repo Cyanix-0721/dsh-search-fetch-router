@@ -335,19 +335,19 @@ test('client: the add button appends a reference name through form.mutate', asyn
 
   await addButtons[0].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['tavilyApiKeyRefs', 1], value: 'TAVILY_API_KEY_2' },
+    { op: 'set', path: ['tavilyApiKeyRefs'], value: ['TAVILY_API_KEY', 'TAVILY_API_KEY_2'] },
   ]);
 
   // The second add button targets the exa array (search providers render before fetch).
   await addButtons[1].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['exaApiKeyRefs', 1], value: 'EXA_API_KEY_2' },
+    { op: 'set', path: ['exaApiKeyRefs'], value: ['EXA_API_KEY', 'EXA_API_KEY_2'] },
   ]);
 
   // The third targets the firecrawl array independently.
   await addButtons[2].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'set', path: ['firecrawlApiKeyRefs', 1], value: 'FIRECRAWL_API_KEY_2' },
+    { op: 'set', path: ['firecrawlApiKeyRefs'], value: ['FIRECRAWL_API_KEY', 'FIRECRAWL_API_KEY_2'] },
   ]);
 });
 
@@ -370,7 +370,7 @@ test('client: a remove button unsets that reference', async () => {
 
   await removeButtons[0].props.onClick();
   assert.deepEqual(state.mutations.at(-1), [
-    { op: 'unset', path: ['tavilyApiKeyRefs', 0] },
+    { op: 'set', path: ['tavilyApiKeyRefs'], value: ['TAVILY_API_KEY_2'] },
   ]);
 });
 
