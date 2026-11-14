@@ -218,8 +218,8 @@ test('client: the card renders a field per configured reference', () => {
   const tree = element.type(element.props);
   assert.equal(tree.type, 'div');
   const children = tree.children.flat(Infinity).filter(Boolean);
-  // title, description, tavily group, firecrawl group, exa group, note
-  assert.equal(children.length, 6);
+  // title, description, tavily group, firecrawl group, exa group, max-results block, note
+  assert.equal(children.length, 7);
 
   const inputs = collectKeyInputs(tree);
   const labels = inputs.map((field) => field.props['data-sfr-key']).sort();
@@ -699,4 +699,48 @@ test('client: a real describe envelope resolves the toggle to the stored off sta
   const view = findNamespaceView(unwrapRemote(envelope), 'search-fetch-router');
   assert.equal(view.revision, 3);
   assert.equal(viewEnabled(view), false, 'stored enabled:false must read as off');
+});
+
+test('client: normalizeMaxResultsMode whitelists the three modes and defaults to cap', () => {
+  const { captured, require } = loadBundle();
+  const { normalizeMaxResultsMode } = captured.factory(require).__test;
+  assert.equal(normalizeMaxResultsMode('provider-max'), 'provider-max');
+  assert.equal(normalizeMaxResultsMode(' PROVIDER-DEFAULT '), 'provider-default');
+  assert.equal(normalizeMaxResultsMode('cap'), 'cap');
+  assert.equal(normalizeMaxResultsMode('nope'), 'cap');
+  assert.equal(normalizeMaxResultsMode(42), 'cap');
+});
+
+test('client: settings card renders the max-results input and three mode buttons', () => {
+  const { captured, require } = loadBundle();
+  const { RouterSettingsCard } = captured.factory(require).__test;
+  const form = {
+    getSnapshot: () => ({ value: {
+      providerOrder: ['tavily', 'exa', 'firecrawl'],
+      maxSearchResults: 20,
+      maxResultsMode: 'provider-max',
+      tavilyApiKeyRefs: ['TAVILY_API_KEY'],
+      exaApiKeyRefs: ['EXA_API_KEY'],
+      firecrawlApiKeyRefs: ['FIRECRAWL_API_KEY'],
+    } }),
+    mutate: async () => true,
+    subscribe: () => () => {},
+  };
+  const ctx = { remote: { credentials: { async describe() { return { ok: true, value: {} }; }, async set() { return { ok: true }; } } } };
+  const tree = RouterSettingsCard({ ctx, form, t: (key) => key });
+  const found = [];
+  const walk = (node) => {
+    if (node === null || node === undefined) return;
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (typeof node !== 'object') return;
+    if (node.props) found.push(node);
+    if (node.children) walk(node.children);
+  };
+  walk(tree);
+  const modes = found.filter((n) => n.type === 'button' && n.props['data-sfr-mode']);
+  assert.equal(modes.length, 3, 'three mode buttons');
+  const active = modes.filter((n) => n.props['aria-pressed'] === true);
+  assert.equal(active.length, 1);
+  assert.equal(active[0].props['data-sfr-mode'], 'provider-max');
+  assert.ok(found.some((n) => n.type === 'input' && n.props['data-sfr-maxresults'] === 'input'), 'max-results input present');
 });

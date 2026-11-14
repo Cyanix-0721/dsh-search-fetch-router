@@ -44,7 +44,8 @@
    配置保留）；否则读 `providerOrder`（搜索与抓取唯一一份）。
    随后 `warnUnknownProviders()` 把表里未注册的 id 打一行 `warn` 后跳过（正常 UI 产生不了，
    只有手改配置才会；不硬报错是因为 Config 抛错会连累两条被 pin 的链一起挂）。
-   搜索还会用 `withMaxResults()` 把结果条数夹到 `maxSearchResults` 上限后再下发。
+   搜索还会用 `requestForBackend()` 按 `maxResultsMode` 决定条数：`cap` 夹到 `maxSearchResults` 上限；
+   `provider-max` 用各家硬上限（`backend.maxResults`）；`provider-default` 不传条数、用各家默认。
 2. **准备就绪（先解析 key，再决策）**：`prepareReadiness()` 对表里每个已注册供应商建一条视图：
    - **keyed**（有 key 池）：把配置里的「引用名数组」解析成候选 key（凭据服务 → 环境层），
      顺手记录本次该从第几把 key 领起（`KeyRing#claim()`，并发下分摊 key）。
@@ -70,7 +71,8 @@
 | `unusable` | 适配器 `run` 的返回 | 「这次没拿出可用内容」（空正文/抓不到），换下一家，**不罚 key** |
 | `requestLevel` | `lib/rest.js` 的 `requestFailure` | 上游 200 但响应体是错误：请求级失败，**不罚 key** |
 | `errorPayload` | `lib/rest.js` | 识别「HTTP 200 但响应体其实是错误」，转成 `requestLevel` 失败，而不是静默返回空结果 |
-| 结果条数上限 | `lib/config.js` 的 `maxSearchResults` | 统一各家默认条数：请求给更小的尊重更小，给更大的按上限截断 |
+| 结果条数上限 | `lib/config.js` 的 `maxSearchResults` | 统一各家默认条数：请求给更小的尊重更小，给更大的按上限截断（`maxResultsMode=cap` 时生效） |
+| 条数取值方式 | `lib/config.js` 的 `maxResultsMode` | `cap` 统一上限 / `provider-max` 各家硬上限 / `provider-default` 各家默认 |
 | 未知供应商 id | `lib/execute.js` 的 `warnUnknownProviders` | `providerOrder` 里未注册的 id 打 `warn` 后跳过（UI 产生不了，仅手改配置会遇到） |
 | 超时冷却 | `lib/keyring.js` | 「慢」不是「坏」：超时按 1/5 冷却（下限 1s），不吃 `Retry-After` 放大 |
 | 额度冷却 | `lib/keyring.js` | 432/433 类额度耗尽按更长冷却，且不判 key 永久失效 |

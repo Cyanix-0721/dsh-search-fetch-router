@@ -1200,3 +1200,54 @@ test('fetch: enabled=false bypasses every configured key and needs the local fal
     stub.restore();
   }
 });
+
+test('search: maxResultsMode=provider-max overrides the unified cap with each backend hard limit', async () => {
+  const seen = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000, maxResults: 100,
+    async run({ request }) { seen.push(request.maxResults); return { sources: [{ url: 'https://x/1' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['fake'], fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000,
+    searchFallback: false, maxSearchResults: 10, maxResultsMode: 'provider-max',
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q', maxResults: 3 }, undefined);
+  await router.search({ query: 'q' }, undefined);
+  assert.deepEqual(seen, [100, 100]);
+});
+
+test('search: maxResultsMode=provider-default omits the count entirely', async () => {
+  const seen = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000, maxResults: 100,
+    async run({ request }) { seen.push(request.maxResults); return { sources: [{ url: 'https://x/1' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['fake'], fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000,
+    searchFallback: false, maxResultsMode: 'provider-default',
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q', maxResults: 3 }, undefined);
+  assert.equal(seen[0], undefined);
+});
+
+test('search: an unknown maxResultsMode falls back to the unified cap', async () => {
+  const seen = [];
+  const fakeBackend = {
+    id: 'fake', label: 'Fake', keyRefsField: 'fakeApiKeyRefs', timeoutField: 'fakeTimeoutMs', defaultTimeoutMs: 5_000,
+    async run({ request }) { seen.push(request.maxResults); return { sources: [{ url: 'https://x/1' }], truncated: false }; },
+  };
+  const config = {
+    providerOrder: ['fake'], fakeApiKeyRefs: ['FAKE_KEY'], fakeTimeoutMs: 5_000, cooldownMs: 60_000,
+    searchFallback: false, maxSearchResults: 10, maxResultsMode: 'bogus',
+  };
+  const ctx = fakeCtx({ credentials: fakeCredentials({ FAKE_KEY: 'fk' }) });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  await router.search({ query: 'q', maxResults: 50 }, undefined);
+  assert.equal(seen[0], 10);
+});

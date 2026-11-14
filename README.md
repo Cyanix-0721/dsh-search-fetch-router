@@ -194,7 +194,8 @@ live.
 | `firecrawlTimeoutMs` | `30000` | per-segment timeout |
 | `httpTimeoutMs` | `10000` | per-segment timeout |
 | `maxBodyChars` | `100000` | truncation point for returned bodies |
-| `maxSearchResults` | `20` | upper bound on results requested per provider; a smaller `maxResults` on the request is respected |
+| `maxSearchResults` | `20` | upper bound on results requested per provider; a smaller `maxResults` on the request is respected; only used when `maxResultsMode=cap` |
+| `maxResultsMode` | `cap` | how many results to request: `cap` = the unified `maxSearchResults`; `provider-max` = each provider's own hard limit (Tavily 20 / Exa 100 / Firecrawl 100); `provider-default` = omit the count so each provider applies its default |
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | provider ids in enable order — used by **both** search and fetch; providers without a key are skipped at runtime. The card's reorder/disable edits this list. `deepseek-official` (search) and local `http` (fetch) are the fallbacks |
