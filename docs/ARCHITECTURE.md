@@ -93,7 +93,7 @@ lib/rest.js                 三家共用的 JSON POST 底座（超时/错误/取
 lib/keyring.js              key 池：轮转、冷却分档、失效判定
 lib/errors.js               稳定错误码与 WebError 包装
 lib/urls.js                 URL 校验
-lib/client.js               零构建浏览器设置卡（供应商排序/停用、key+备注）
+lib/client.js               零构建浏览器设置卡（供应商排序/停用、改 key 名称）
 ```
 
 ## 加一个供应商（执行层一行都不用改）

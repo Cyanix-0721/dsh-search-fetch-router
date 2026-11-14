@@ -15,7 +15,7 @@ environment) and the plugin only ever holds a reference name.
 the host's `deepseek-official` is appended as a fallback when `searchFallback` is on; for fetch
 the local `http` fetcher is appended when `fetchFallback` is on. Disabling a provider on the
 plugin-page card removes it from **both** chains. The card also lets you reorder (drag or
-arrows) and add a note to each provider, and shows a masked preview of each stored key.
+arrows) and rename each key, and shows a masked preview of each stored key.
 
 Each provider is used for search and/or fetch depending on what it implements:
 
@@ -122,10 +122,12 @@ export TAVILY_API_KEY=tvly-...
 ```
 
 The easiest way to fill these in is the **API keys** card this plugin adds to its own
-page under **插件 / Plugins** — one password field per reference name, saved straight to
-the DSH credentials store. Press **+ Add another key** to append another reference name
-(`TAVILY_API_KEY_2`, …) and a new field; the pool rotates across them, and a per-row
-**Remove** drops one (you can never delete the last). Values still never touch a YAML
+page under **插件 / Plugins** — each row has an editable reference name and a password
+field, saved straight to the DSH credentials store. Press **+ Add a key row** to append
+another reference name (`TAVILY_API_KEY_2`, …) and a new field; the pool rotates across
+them, and a per-row **Remove** drops one (you can never delete the last). You can rename a
+row's reference name in place; renaming does not move an already-stored key, so re-enter it
+under the new name. Values still never touch a YAML
 file. If you would rather edit by hand, the block above works too. (The host's built-in
 credential UI only covers model-provider keys, so an arbitrary name like `TAVILY_API_KEY`
 has no button there; the file is already 0600 and the host refuses to start if that ever
@@ -196,7 +198,6 @@ live.
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | provider ids in enable order — used by **both** search and fetch; providers without a key are skipped at runtime. The card's reorder/disable edits this list. `deepseek-official` (search) and local `http` (fetch) are the fallbacks |
-| `keyNotes` | `{}` | per-key local notes (ref → one line), display only |
 | `verboseLog` | `false` | when on, the "which backend served this" line moves from `debug` to `info`, so it shows at the normal log level |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |
@@ -221,7 +222,7 @@ Failures carry a stable `code`, surfaced in the tool's structured error metadata
 
 Set `verboseLog` to `true` to get one line per request naming the backend that served it and how long it took (`web_search served by tavily (key TAVILY_API_KEY) in 812ms`), or — when everything failed — a `... all backends failed: <summary>` line where each provider's error is spelled out.
 
-- `*_ALL_PROVIDERS_FAILED` — read the `summary`; it lists every provider's error. Usually an empty/invalid key, a quota-exhausted key, or a provider outage. Check the key values and the per-key notes on the card.
+- `*_ALL_PROVIDERS_FAILED` — read the `summary`; it lists every provider's error. Usually an empty/invalid key, a quota-exhausted key, or a provider outage. Check the key values and the per-key names on the card.
 - `*_BUDGET_EXHAUSTED` — the budget ran out before any provider finished; usually too many providers/keys for the budget, or one slow provider. Raise `searchTotalBudgetMs` / `totalBudgetMs`, or lower the per-provider timeouts.
 - `WEB_INVALID_URL` — only `http(s)` URLs without embedded credentials are fetched.
 - `WEB_ABORTED` — the caller cancelled the request; not a plugin failure.

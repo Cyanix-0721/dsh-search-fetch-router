@@ -458,32 +458,121 @@ test('client: rendered search-provider order follows providerOrder', () => {
   );
 });
 
-test('client: KeyField shows the masked preview and a note input', () => {
+test('client: KeyField shows the masked preview and an editable name input', () => {
   const { captured, require } = loadBundle();
-  const exported = captured.factory(require);
-  const { KeyField } = exported.__test;
+  const { KeyField } = captured.factory(require).__test;
   const t = (key) => key;
   const node = KeyField({
     t,
     reference: 'TAVILY_API_KEY',
     status: { configured: true, writable: true, busy: false, masked: '••••abcd' },
     draft: '',
-    note: 'work account',
     onEdit: () => {},
     onSave: () => {},
-    onNoteCommit: () => {},
   });
-
   const spans = flatten(node).filter((n) => n.type === 'span');
   assert.ok(
     spans.some((span) => [].concat(span.children).join('').includes('••••abcd')),
     'masked preview rendered in the badge',
   );
-  const noteInputs = flatten(node).filter(
-    (n) => n.type === 'input' && n.props?.['data-sfr-note'] !== undefined,
+  const nameInputs = flatten(node).filter(
+    (n) => n.type === 'input' && n.props?.['data-sfr-name'] === 'TAVILY_API_KEY',
   );
-  assert.equal(noteInputs.length, 1);
-  assert.equal(noteInputs[0].props.defaultValue, 'work account');
+  assert.equal(nameInputs.length, 1, '名称是可编辑输入');
+  assert.equal(nameInputs[0].props.value, 'TAVILY_API_KEY');
+  assert.equal(typeof nameInputs[0].props.onChange, 'function', '名称改动只落在本地草稿');
+  assert.equal(nameInputs[0].props.onBlur, undefined, '名称不在 blur 时落库');
+  const saveBtn = flatten(node).filter((n) => n.type === 'button')[0];
+  assert.equal(saveBtn.props.disabled, true, '没输 key、也没改名称时保存按钮禁用');
+
+  const active = KeyField({
+    t,
+    reference: 'TAVILY_API_KEY',
+    status: { configured: false, writable: true, busy: false },
+    draft: 'tvly-partial',
+    onEdit: () => {},
+    onSave: () => {},
+  });
+  const activeSave = flatten(active).filter(
+    (n) => n.type === 'button' && n.props?.['aria-label'] === undefined && n.props?.['data-sfr-add'] === undefined,
+  )[0];
+  assert.equal(activeSave.props.disabled, false, '有草稿时可保存');
+});
+
+test('client: save button state helper', () => {
+  const { captured, require } = loadBundle();
+  const { saveDisabled } = captured.factory(require).__test;
+  assert.equal(saveDisabled(true, true, true), true, '忙碌时禁用');
+  assert.equal(saveDisabled(false, false, false), true, '没有 key 草稿也没改名称时禁用');
+  assert.equal(saveDisabled(false, true, false), false, '有 key 草稿时可用');
+  assert.equal(saveDisabled(false, false, true), false, '只改了名称也可保存');
+});
+
+test('client: validateRefName rejects bad or duplicate names', () => {
+  const { captured, require } = loadBundle();
+  const { validateRefName } = captured.factory(require).__test;
+  assert.equal(validateRefName('TAVILY_API_KEY_2', ['TAVILY_API_KEY'], 'TAVILY_API_KEY'), null);
+  assert.equal(validateRefName('TAVILY_API_KEY', ['TAVILY_API_KEY'], 'TAVILY_API_KEY'), null, '不改原名视为通过');
+  assert.equal(validateRefName('1bad', ['TAVILY_API_KEY'], 'TAVILY_API_KEY'), 'invalidName', '数字开头非法');
+  assert.equal(validateRefName('has space', [], 'X'), 'invalidName', '空格非法');
+  assert.equal(validateRefName('EXA_API_KEY', ['EXA_API_KEY'], 'TAVILY_API_KEY'), 'duplicateName', '撞名');
+  assert.equal(validateRefName('  MY_KEY  ', [], 'X'), null, '两端空白裁掉后合法');
+  assert.equal(validateRefName('', [], 'X'), 'emptyName', '空名');
+  assert.equal(validateRefName('   ', [], 'X'), 'emptyName', '纯空白也算空名');
+});
+
+test('client: planSave 决定改名下标 / 是否写 key / 错误，且不做任何 I/O', () => {
+  const { captured, require } = loadBundle();
+  const { planSave } = captured.factory(require).__test;
+  const fieldInfo = { field: 'tavilyApiKeyRefs', list: ['TAVILY_API_KEY', 'TAVILY_API_KEY_2'] };
+  const refs = ['TAVILY_API_KEY', 'TAVILY_API_KEY_2', 'EXA_API_KEY'];
+
+  // 改名 + 填 key：下标取该 ref 在字段数组里的位置，key 去掉两端空白。
+  assert.deepEqual(
+    planSave({ reference: 'TAVILY_API_KEY', newNameRaw: 'TAVILY_MAIN', text: ' tvly-abc ', fieldInfo, refs }),
+    { error: null, noop: false, rename: { field: 'tavilyApiKeyRefs', index: 0, to: 'TAVILY_MAIN' }, key: 'tvly-abc' },
+  );
+  // 只改名、不填 key。
+  const renameOnly = planSave({ reference: 'TAVILY_API_KEY_2', newNameRaw: 'TAVILY_BACKUP', text: '', fieldInfo, refs });
+  assert.deepEqual(renameOnly.rename, { field: 'tavilyApiKeyRefs', index: 1, to: 'TAVILY_BACKUP' });
+  assert.equal(renameOnly.key, null);
+  // 只填 key、不改名。
+  const keyOnly = planSave({ reference: 'TAVILY_API_KEY', newNameRaw: 'TAVILY_API_KEY', text: 'tvly-x', fieldInfo, refs });
+  assert.equal(keyOnly.rename, null);
+  assert.equal(keyOnly.key, 'tvly-x');
+  // 既没改名也没填 key：noop。
+  assert.equal(
+    planSave({ reference: 'TAVILY_API_KEY', newNameRaw: 'TAVILY_API_KEY', text: '', fieldInfo, refs }).noop,
+    true,
+  );
+  // 撞名：拒绝，且不产生 rename / key。
+  assert.deepEqual(
+    planSave({ reference: 'TAVILY_API_KEY', newNameRaw: 'EXA_API_KEY', text: '', fieldInfo, refs }),
+    { error: 'duplicateName', noop: false, rename: null, key: null },
+  );
+  // 空名。
+  assert.equal(planSave({ reference: 'TAVILY_API_KEY', newNameRaw: '   ', text: '', fieldInfo, refs }).error, 'emptyName');
+  // ref 不属于任何配置字段：failed。
+  assert.equal(planSave({ reference: 'GHOST', newNameRaw: 'NEW', text: '', fieldInfo: undefined, refs }).error, 'failed');
+});
+
+test('client: key 输入框保有可访问名称', () => {
+  const { captured, require } = loadBundle();
+  const { KeyField } = captured.factory(require).__test;
+  const t = (key) => key;
+  const node = KeyField({
+    t,
+    reference: 'TAVILY_API_KEY',
+    status: { configured: true, writable: true, busy: false },
+    draft: '',
+    onEdit: () => {},
+    onSave: () => {},
+  });
+  const key = flatten(node).find(
+    (n) => n.type === 'input' && n.props?.['data-sfr-key'] === 'TAVILY_API_KEY',
+  );
+  assert.ok(key, 'key 输入框渲染出来了');
+  assert.equal(key.props['aria-label'], 'keyLabel: TAVILY_API_KEY', 'key 输入框带 aria-label，读屏能读出这是哪把 key');
 });
 
 test('client: provider ordering helpers (toggle / move-before / swap / merge)', () => {

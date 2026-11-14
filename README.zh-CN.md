@@ -9,7 +9,7 @@
 
 ## 路由
 
-**搜索与抓取** —— 都按同一份 `providerOrder`（默认 `["tavily", "exa", "firecrawl"]`，没配 key 的供应商运行时自动跳过）。搜索在末尾追加宿主的 `deepseek-official` 兜底（受 `searchFallback` 控制）；抓取在末尾追加本地 `http` 兜底（受 `fetchFallback` 控制）。在插件页卡片上停用一家，**两条链都不用它**。卡片还可以拖拽或上下箭头排序、给每家写备注，并显示已保存 key 的掩码预览。
+**搜索与抓取** —— 都按同一份 `providerOrder`（默认 `["tavily", "exa", "firecrawl"]`，没配 key 的供应商运行时自动跳过）。搜索在末尾追加宿主的 `deepseek-official` 兜底（受 `searchFallback` 控制）；抓取在末尾追加本地 `http` 兜底（受 `fetchFallback` 控制）。在插件页卡片上停用一家，**两条链都不用它**。卡片还可以拖拽或上下箭头排序、改每把 key 的名称，并显示已保存 key 的掩码预览。
 
 每家供应商按它实现了什么来决定用于搜索和/或抓取：
 
@@ -104,10 +104,11 @@ records: {}
 export TAVILY_API_KEY=tvly-...
 ```
 
-最省事的填法是用本插件在**插件页**加的那张「API 密钥」卡片——每个引用名一个密码框，
-保存即写入 DSH 凭据库，值同样不碰任何 YAML。点「＋ 再加一把 key」会自动追加一个引用名
-（`TAVILY_API_KEY_2`…）并多出一个输入框，请求在这些账号之间轮转；每行的「移除」可以删掉
-一个（最后一个删不掉）。想手填也行，上面那段照写。
+最省事的填法是用本插件在**插件页**加的那张「API 密钥」卡片——每行有一个可改的引用名
+和一个密码框，保存即写入 DSH 凭据库，值同样不碰任何 YAML。点「＋ 添加一行 key」会自动
+追加一行（引用名 `TAVILY_API_KEY_2`… 加一个空密码框），请求在这些账号之间轮转；每行的
+「移除」可以删掉一个（最后一个删不掉）。引用名可以直接在行首改；改名不会搬移已经存过的
+key，改完要在新名字下重填一次。想手填也行，上面那段照写。
 （宿主自带的凭据界面只管模型供应商的 key，像 `TAVILY_API_KEY` 这种自定义引用名
 没有按钮；文件本来就是 0600，权限一旦放宽宿主会拒绝启动。）
 
@@ -169,7 +170,6 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | 供应商启用顺序，**搜索与抓取共用**；没配 key 的运行时跳过。插件页的排序/停用改的就是它。兜底是官方 `deepseek-official`（搜索）与本地 `http`（抓取） |
-| `keyNotes` | `{}` | 每把 key 的本机备注（ref→一句话），只展示不参与请求 |
 | `verboseLog` | `false` | 打开后把「这次由哪个后端服务」从 `debug` 升到 `info`，普通日志级别就能看见 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |
@@ -194,7 +194,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 
 把 `verboseLog` 打开，就能在日志里看到每次请求由哪个后端服务、耗时多少（`web_search served by tavily (key TAVILY_API_KEY) in 812ms`）；全失败时是一行 `... all backends failed: <summary>`，逐家写明原因。
 
-- `*_ALL_PROVIDERS_FAILED` —— 看报错里的 `summary`，它逐家列了错误。多数是 key 空/无效、额度用尽，或供应商故障。先核 key 的值和卡片上给每把 key 写的备注。
+- `*_ALL_PROVIDERS_FAILED` —— 看报错里的 `summary`，它逐家列了错误。多数是 key 空/无效、额度用尽，或供应商故障。先核 key 的值和卡片上每把 key 的名称。
 - `*_BUDGET_EXHAUSTED` —— 预算在任何一个后端跑完前就耗尽：多半是供应商/key 太多，或有后端太慢。调大 `searchTotalBudgetMs` / `totalBudgetMs`，或调小各家的单次超时。
 - `WEB_INVALID_URL` —— 只抓 `http(s)`、且不带内嵌凭据的 URL。
 - `WEB_ABORTED` —— 调用方取消了请求，不是插件故障。
