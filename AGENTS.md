@@ -7,6 +7,8 @@
 一个 DSH（DeepSeek Harness）插件，接管 `ctx.web` 的搜索与抓取两条能力，路由顺序：
 
 - **搜索与抓取共用一张 `providerOrder`**（默认 `tavily`、`exa`、`firecrawl`，没配 key 的运行时自动跳过；插件页卡片可排序/停用/改 key 名称）。搜索末尾可回落 DSH 官方 `deepseek-official`（走 magpie 网关）；抓取末尾可回落本地 `http`
+- **输入框左侧有「搜索增强」总开关**（`enabled`，volatile，即时生效）：关掉=**旁路**，搜索走官方、抓取走本地 http，第三方 key 一律不调用，但配置保留、开回来即恢复（provider 被 patch 静态 pin，插件无法真正卸载）
+- **结果条数三种取法**（`maxResultsMode`，插件页三个按钮）：`cap` 用统一上限 `maxSearchResults`（默认 20）/ `provider-max` 按各家硬上限（Tavily 20、Exa 100、Firecrawl 100）/ `provider-default` 不传、让各家用自己的默认值
 
 高级抓取（整站爬、反爬、结构化抽取）不归本插件管，交给 firecrawl MCP。
 
@@ -24,8 +26,9 @@ provider id 是 `search-fetch-router`，搜索与抓取共用（seam 存两张�
 3. **patch 里 id-targeted 的 `config` 是整块替换**，不是深度合并
    （`cordis-plugin-include` 的 `applyEntryPatches` 执行 `target[key] = value`）。
    `web` 的两个 provider 字段必须一起写；`tool-web` 的每个字段都要重写一遍。
-4. **`tool-web.fetchTimeoutMs` 必须 ≥ `totalBudgetMs`。** 工具层默认 30 s，本插件链
-   预算 45 s，不改就会被工具层腰斩。patch 里设 60 s。
+4. **`tool-web.fetchTimeoutMs` 必须 ≥ `totalBudgetMs`，`tool-web.searchTimeoutMs` 必须 ≥
+   `searchTotalBudgetMs`。** 工具层默认 30 s，本插件链预算 45 s / 30 s，不改就会被工具层
+   腰斩。patch 里两个都设 60 s。
 5. **密钥永不进 YAML。** 配置字段只存 credentials 引用名（`TAVILY_API_KEY` 这种）。
    测试里的 key 一律用一眼假的值（`fc-FAKE-TEST-KEY`）。
 6. **`credentials.listRecords()` 只枚举 records，不枚举 refs。** 所以池的可枚举性来自
@@ -43,6 +46,18 @@ provider id 是 `search-fetch-router`，搜索与抓取共用（seam 存两张�
     要别的宿主模块必须在 `dsh.client.inject` 里声明——但本项目只用种子，保持零 inject。
 11. **密钥卡片只走 `ctx.remote.credentials.set/describe`**，值落 `~/.dsh/.credentials.yaml`。
     别改成自己发 HTTP 或用 `cordis.patch.yml` 存值，那就把「是否进 YAML」的初衷丢了。
+12. **配置字段不要用 `z.union` / `z.enum` 做枚举校验**，一律 `z.string()` + 使用时用
+    `normalize*` 白名单规整（坏的按默认处理）。Config 校验抛错会让**整个插件加载失败**，
+    而 `web.searchProvider` / `web.fetchProvider` 都被 patch 静态 pin 到本插件，等于把
+    `web_search`/`web_fetch` 一起弄挂——一个手写 YAML 的拼写错误不该有这种后果。
+13. **`settings.mutate` 只接受 volatile 字段路径**；非 volatile 会抛
+    `Config field "..." is not volatile`。要能热改的配置项必须 `.volatile()`。
+14. **客户端调远端一律先剥 `{ok, value}` 信封**（`ctx.remote.settings.describe/mutate`、
+    `ctx.remote.credentials.*` 都是这个形态）。不剥就会「写成功却显示没生效」：
+    `findNamespaceView` 永远取不到视图、状态恒读默认。见 `lib/client.js` 的 `unwrapRemote()`。
+15. **配置里的 ref 名数组一律写整个数组，不要按索引 `set`/`unset`。** 这些数组常常还只是
+    schema 默认值、没真正落进配置文档；对不存在的数组按下标写会被 `configForms.mutate`
+    整条拒绝（前端表现为「保存失败」）。见 `lib/client.js` 的 `addRef`/`removeRef`/`save`。
 
 ## 目录
 
@@ -62,7 +77,7 @@ lib/firecrawl.js      /v2/scrape 与 /v2/search 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
 lib/execute.js        执行层：把决策落到调用上，失败降级
-lib/client.js         零构建浏览器设置卡：填 key（写 credentials），搜索供应商可排序/停用、改 key 名称，显示 key 掩码；可加/删多账号
+lib/client.js         零构建浏览器 bundle：设置卡片（填 key / 改 key 名称 / 排序停用 / 最大结果条数三档 / 掩码）＋输入框左侧「搜索增强」启停按钮
 test/*.test.js        node --test，无框架依赖
 ```
 
@@ -81,9 +96,11 @@ node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-
 
 - **决策与执行分开。** 新逻辑先问「这是纯决策吗」——是就进 `lib/router.js`，那里可以
   零成本测完所有分支。
-- **新增搜索供应商走注册表，不加 if 分支。** 在 `lib/search-backends.js` 的 `SEARCH_BACKENDS`
-  加一项 + `lib/config.js` 加字段 + 用户把 id 填进 `providerOrder`；
-  `lib/execute.js` 与 `lib/router.js` 保持数据驱动，不写 `if (backend === ...)`。
+- **新增搜索供应商走注册表，不加 if 分支。** 要动三处：`lib/search-backends.js` 的
+  `SEARCH_BACKENDS` 加一项（含 `maxResults` 硬上限）+ `lib/config.js` 加 ref/timeout 字段 +
+  `lib/client.js` 的 `SEARCH_PROVIDERS` 加一行（`field`/`base`/`caps`/`maxResults`，否则卡片
+  不显示这家 key）；用户再把 id 填进 `providerOrder`。`lib/execute.js` 与 `lib/router.js`
+  保持数据驱动，不写 `if (backend === ...)`。
 - **新增抓取供应商同理走 `lib/fetch-backends.js`。** 抓取与搜索共用 `providerOrder`，没有单独固定顺序；
   适配器在注册表里，`run` 返回 `{kind:'result'}` 或 `{kind:'unusable',reason}`。**整站爬 /
   反爬 / 结构化抽取 / 批量任务仍归 firecrawl MCP，绝不塞进本插件**——本插件只是 `web_fetch`
@@ -92,7 +109,7 @@ node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-
   新增后端时至少覆盖：成功、报错、内容为空、预算不足。
 - **错误码稳定。** `lib/errors.js` 的 `CODES` 是外部契约，工具层会把 code 放进结构化
   错误元数据。加新码可以，改旧码不行。
-- **注释写「为什么」。** 上面那七条硬约束都对应一次真实的静默失败，代码里的注释要能
+- **注释写「为什么」。** 上面那些硬约束每一条都对应一次真实的静默失败，代码里的注释要能
   让下一个人不重犯。
 
 ## 不要做
@@ -102,4 +119,6 @@ node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-
 - 不要复用 `@firecrawl/dsh-firecrawl` 的包：它的 peer 锁在 DSH `0.1.0-rc.6`，比当前宿主
   老两个 rc。抄实现，不抄依赖。
 - 不要在 patch 里加 `insert` 以外的密钥、token、session id。
+- 不要把 `.volatile()` 配置项改成非 volatile——`settings.mutate` 会拒写，设置卡片当场失效。
+- 不要按索引写 ref 名数组（`set path:[field, index]`）——数组还没落盘时会被整条拒绝，改整数组。
 - 不要把 `pnpm-lock.yaml`、`.plugin-manager/logs/`、`.dsh-market/` 提交进来。
