@@ -1082,6 +1082,33 @@ test('search: an unregistered provider id in providerOrder is skipped with a war
   );
 });
 
+test('warn: a throwing warn logger never breaks the request', async () => {
+  const fakeBackend = {
+    id: 'fake',
+    label: 'Fake',
+    keyRefsField: 'fakeApiKeyRefs',
+    timeoutField: 'fakeTimeoutMs',
+    defaultTimeoutMs: 5_000,
+    async run() {
+      return { sources: [{ url: 'https://fake.example/ok' }], truncated: false };
+    },
+  };
+  const config = {
+    providerOrder: ['tavlp', 'fake'],
+    fakeApiKeyRefs: ['FAKE_KEY'],
+    fakeTimeoutMs: 5_000,
+    cooldownMs: 60_000,
+    searchFallback: false,
+  };
+  const ctx = fakeCtx({
+    credentials: fakeCredentials({ FAKE_KEY: 'fk' }),
+    logger: { warn() { throw new Error('warn exploded'); }, debug() {}, info() {} },
+  });
+  const router = createRouter(ctx, config, { searchBackends: { ...SEARCH_BACKENDS, fake: fakeBackend } });
+  const result = await router.search({ query: 'q' }, undefined);
+  assert.equal(result.sources[0].url, 'https://fake.example/ok');
+});
+
 test('search: maxResults is capped by maxSearchResults and respects a smaller request value', async () => {
   const seen = [];
   const fakeBackend = {
