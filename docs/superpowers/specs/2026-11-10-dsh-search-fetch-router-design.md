@@ -245,7 +245,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 232 tests.
+`node --test`, no framework, no build step. 242 tests.
 
 - `test/router.test.js` — data-driven search chain order (`providerOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.

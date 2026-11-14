@@ -198,6 +198,7 @@ live.
 | `cooldownMs` | `60000` | how long a failed key sits out |
 | `searchTotalBudgetMs` | `30000` | hard cap for one search |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | provider ids in enable order — used by **both** search and fetch; providers without a key are skipped at runtime. The card's reorder/disable edits this list. `deepseek-official` (search) and local `http` (fetch) are the fallbacks |
+| `enabled` | `true` | master switch (the "Search boost" toggle at the left of the composer). Off = **bypass only**: search goes straight to the official `deepseek-official`, fetch to the local `http`; no third-party key is called, and all keys/order stay as configured. Applies live, no restart |
 | `verboseLog` | `false` | when on, the "which backend served this" line moves from `debug` to `info`, so it shows at the normal log level |
 | `searchFallback` | `true` | fall back to `deepseek-official` |
 | `fetchFallback` | `true` | fall back to local `http` |

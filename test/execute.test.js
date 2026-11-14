@@ -1165,3 +1165,38 @@ test('search: maxSearchResults defaults to 20 when the config field is absent', 
   await router.search({ query: 'q' }, undefined);
   assert.deepEqual(seen, [20, 20]);
 });
+
+test('search: enabled=false bypasses every configured key and needs the official fallback', async () => {
+  const stub = stubFetch(() => {
+    throw new Error('disabled router must not touch the network');
+  });
+  try {
+    // 有 Tavily key，但总开关关掉：第三方一家都不许调，兜底也关 → 直接报「没有可用供应商」。
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({ enabled: false, searchFallback: false }));
+    await assert.rejects(
+      () => router.search({ query: 'q' }, undefined),
+      /no web search provider is usable/,
+    );
+    assert.equal(stub.calls.length, 0, 'disabled router must not call any provider');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('fetch: enabled=false bypasses every configured key and needs the local fallback', async () => {
+  const stub = stubFetch(() => {
+    throw new Error('disabled router must not touch the network');
+  });
+  try {
+    const ctx = fakeCtx({ credentials: fakeCredentials({ TAVILY_API_KEY: 'k' }) });
+    const router = createRouter(ctx, configWith({ enabled: false, fetchFallback: false }));
+    await assert.rejects(
+      () => router.fetch({ url: 'https://example.com/a' }, undefined),
+      /no web fetch provider is usable/,
+    );
+    assert.equal(stub.calls.length, 0, 'disabled router must not call any provider');
+  } finally {
+    stub.restore();
+  }
+});

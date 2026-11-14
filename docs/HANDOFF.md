@@ -4,7 +4,7 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 232 全过。已**装进本机 web profile**，provider
+插件已实现、已提交、已推到 GitHub，`npm test` 242 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
 `web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
@@ -47,7 +47,7 @@
 
 **已验证**
 
-- `npm test` → 232 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 242 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时

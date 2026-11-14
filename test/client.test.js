@@ -157,6 +157,7 @@ test('client: registers under its package name with the seed-only inject list', 
     'locale',
     'remote',
     'remote.credentials',
+    'remote.settings',
     'configForms',
   ]);
 });
@@ -175,9 +176,12 @@ test('client: mounts one section into plugins.detail.section', () => {
     'zh and en dictionaries must share the same keys',
   );
 
-  assert.equal(registrations.length, 1);
-  assert.equal(registrations[0].options.name, 'plugins.detail.section');
-  assert.equal(registrations[0].options.id, 'dsh-search-fetch-router');
+  const section = registrations.find((r) => r.options.name === 'plugins.detail.section');
+  const toggle = registrations.find((r) => r.options.name === 'conversation.input.left');
+  assert.ok(section, 'the settings section must be registered');
+  assert.ok(toggle, 'the composer toggle must be registered');
+  assert.equal(section.options.id, 'dsh-search-fetch-router');
+  assert.equal(toggle.options.id, 'dsh-search-fetch-router-toggle');
 });
 
 test('client: ignores foreign packages and renders only for its own bundle', () => {
@@ -637,4 +641,62 @@ test('client: every provider shows which chains it serves', () => {
   const tree = element.type(element.props);
   const badges = collectText(tree).filter((text) => text === 'Search · Fetch');
   assert.equal(badges.length, 3, 'all three built-in providers serve both chains');
+});
+
+test('client: findNamespaceView picks by namespace and viewEnabled reads enabled', () => {
+  const { captured, require } = loadBundle();
+  const { findNamespaceView, viewEnabled } = captured.factory(require).__test;
+  const describeValue = {
+    namespaces: [
+      { ns: 'other', value: { enabled: true } },
+      { ns: 'search-fetch-router', value: { enabled: false } },
+    ],
+  };
+  const view = findNamespaceView(describeValue, 'search-fetch-router');
+  assert.equal(view.ns, 'search-fetch-router');
+  assert.equal(findNamespaceView(describeValue, 'missing'), undefined);
+  assert.equal(findNamespaceView(undefined, 'search-fetch-router'), undefined);
+  assert.equal(viewEnabled(view), false);
+  assert.equal(viewEnabled({ value: { enabled: true } }), true);
+  assert.equal(viewEnabled({ value: {} }), true, 'missing enabled field counts as on');
+  assert.equal(viewEnabled(undefined), true);
+});
+
+test('client: RouterToggle renders a switch that defaults to on', () => {
+  const { captured, require } = loadBundle();
+  const { RouterToggle } = captured.factory(require).__test;
+  const el = RouterToggle({ ctx: {} });
+  assert.equal(el.type, 'button');
+  assert.equal(el.props['data-sfr-router-toggle'], '1');
+  assert.equal(el.props.role, 'switch');
+  assert.equal(el.props['aria-checked'], 'true');
+  assert.match(el.props['aria-label'], /Search boost on/);
+  assert.deepEqual(el.children, ['Search boost: on']);
+});
+
+test('client: unwrapRemote peels the {ok,value} envelope and passes bare values through', () => {
+  const { captured, require } = loadBundle();
+  const { unwrapRemote } = captured.factory(require).__test;
+  assert.deepEqual(unwrapRemote({ ok: true, value: { namespaces: [] } }), { namespaces: [] });
+  assert.equal(unwrapRemote({ ok: false, error: { message: 'x' } }), undefined);
+  assert.equal(unwrapRemote(undefined), undefined);
+  const bare = { namespaces: [] };
+  assert.equal(unwrapRemote(bare), bare);
+});
+
+test('client: a real describe envelope resolves the toggle to the stored off state', () => {
+  const { captured, require } = loadBundle();
+  const { unwrapRemote, findNamespaceView, viewEnabled } = captured.factory(require).__test;
+  // remote 调用的真实形态：{ ok:true, value:{ writable, hasDocument, namespaces:[…] } }
+  const envelope = {
+    ok: true,
+    value: {
+      writable: true,
+      hasDocument: true,
+      namespaces: [{ ns: 'search-fetch-router', value: { enabled: false }, revision: 3 }],
+    },
+  };
+  const view = findNamespaceView(unwrapRemote(envelope), 'search-fetch-router');
+  assert.equal(view.revision, 3);
+  assert.equal(viewEnabled(view), false, 'stored enabled:false must read as off');
 });

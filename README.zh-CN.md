@@ -170,6 +170,7 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `cooldownMs` | `60000` | 失败 key 冷却多久 |
 | `searchTotalBudgetMs` | `30000` | 单次搜索硬上限 |
 | `providerOrder` | `["tavily", "exa", "firecrawl"]` | 供应商启用顺序，**搜索与抓取共用**；没配 key 的运行时跳过。插件页的排序/停用改的就是它。兜底是官方 `deepseek-official`（搜索）与本地 `http`（抓取） |
+| `enabled` | `true` | 总开关（输入框左侧「搜索增强」开关控制）。关闭后只做**旁路**：搜索直接走官方 `deepseek-official`、抓取直接走本地 `http`，第三方 key 一概不调用，但 key、顺序等配置原样保留，开回来即恢复。会话内即时生效，不用重启 |
 | `verboseLog` | `false` | 打开后把「这次由哪个后端服务」从 `debug` 升到 `info`，普通日志级别就能看见 |
 | `searchFallback` | `true` | 回落 `deepseek-official` |
 | `fetchFallback` | `true` | 回落本地 `http` |

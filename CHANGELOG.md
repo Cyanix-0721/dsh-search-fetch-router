@@ -11,6 +11,12 @@
 
 ### Added
 
+- 输入框左侧的「搜索增强」开关（`conversation.input.left` 槽位）与对应的 `enabled` 总开关
+  （默认 `true`，volatile，会话内即时生效）。关闭后本路由只做**旁路**：搜索直接走官方
+  `deepseek-official`、抓取直接走本地 `http`，第三方 key 一概不调用，但 key、顺序等配置
+  原样保留，点回来即恢复。因为 `web.searchProvider` / `web.fetchProvider` 被 patch 静态
+  pin 到本插件、`available()` 必须恒真，插件无法真正卸载，所以「禁用」只能是旁路到官方
+  兜底，不能是摘掉插件。
 - `exaSearchType` 配置项：Exa 搜索档位可选 `instant` / `fast` / `auto` / `deep-lite` / `deep` /
   `deep-reasoning`（默认 `auto`）。档位直接影响价格与延迟，此前写死 `auto`。非法值按 `auto`
   处理，不会把未知档位发给上游（上游对未知 `type` 返回 400，会让整次搜索失败）。
