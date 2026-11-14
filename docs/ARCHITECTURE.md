@@ -126,6 +126,11 @@ lib/client.js               零构建浏览器设置卡（供应商排序/停用
   把信封当数据 → `findNamespaceView` 取不到视图 → 状态永远读成默认值，**写成功了界面也显示没生效**。
   一键开关就栽在这里（点一下其实写进磁盘了，却「闪一下又弹回开」）。统一走 `lib/client.js` 的
   `unwrapRemote()` 剥一层。
+- **`settings.mutate` 只认 volatile 字段**：非 volatile 会抛 `Config field "..." is not volatile`，
+  要能热改（不重启）的配置项必须 `.volatile()`。
+- **ref 名数组一律写整数组，别按索引 `set`/`unset`**：这些数组常常还只是 schema 默认值、没真正
+  落进配置文档；对不存在的数组按下标写会被 `configForms.mutate` 整条拒绝（界面表现为「保存失败」）。
+  添加 / 删除 / 改名都要写整个数组，见 `lib/client.js` 的 `addRef`/`removeRef`/`save`。
 
 ## 测试与覆盖
 

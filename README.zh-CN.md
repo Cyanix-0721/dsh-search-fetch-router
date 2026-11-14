@@ -69,7 +69,7 @@
 
 ## 安装
 
-装进 DSH profile——从 npm（`dsh-search-fetch-router@alpha`）或直接从仓库：
+装进 DSH profile——从 npm（`dsh-search-fetch-router@beta`）或直接从仓库：
 
 ```bash
 npx --yes @deepseek-ai/dsh plugin --profile web add \

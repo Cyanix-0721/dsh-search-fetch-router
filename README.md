@@ -85,7 +85,7 @@ Fetch backends are **declaratively registered** in `lib/fetch-backends.js` and s
 
 ## Install
 
-Install into a DSH profile — from npm (`dsh-search-fetch-router@alpha`) or straight from the repository:
+Install into a DSH profile — from npm (`dsh-search-fetch-router@beta`) or straight from the repository:
 
 ```bash
 npx --yes @deepseek-ai/dsh plugin --profile web add \

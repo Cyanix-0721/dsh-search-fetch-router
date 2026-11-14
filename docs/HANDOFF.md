@@ -4,9 +4,10 @@
 
 ## 一句话现状
 
-插件已实现、已提交、已推到 GitHub，`npm test` 242 全过。已**装进本机 web profile**，provider
-已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过一次 `web_search` 与一次
-`web_fetch`（`https://example.com`），均正常返回；未逐条确认底层实际走的是哪个后端。
+插件已实现、已提交、已推到 GitHub，`npm test` 249 全过。已**装进本机 web profile**，provider
+已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过 `web_search` 与 `web_fetch`
+（`https://example.com`），均正常返回；per-request 命中哪家可开 `verboseLog` 在日志里看。
+已发布到 npm：`0.2.0-beta.0`（`latest` 与 `beta` 都指它，`alpha` 是 `0.1.0-alpha.0`）。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
 搜索与抓取共用一张 `providerOrder`（默认 `tavily`→`exa`→`firecrawl`），新增供应商只加注册项与配置字段，执行层不动。
 
@@ -47,7 +48,7 @@
 
 **已验证**
 
-- `npm test` → 242 pass / 0 fail（`node --test`，无框架依赖）。
+- `npm test` → 249 pass / 0 fail（`node --test`，无框架依赖）。
 - `node --check` 全部源文件通过。
 - `apply()` 装配有测试锁住两条硬约束（`test/index.test.js`）：两个 provider 都以
   pinned id 注册且 `available()` 恒 `true`；抓取注册失败（宿主无 fetch seam）时
@@ -102,29 +103,15 @@
 
 ## 下一阶段要做的
 
-1. **重启 DSH 让插件真正加载。** 装与 `--dump-config` 静态验证已完成（见上）。重启后确认
-   运行时 `web.searchProvider` / `web.fetchProvider` 仍是 `search-fetch-router`，且
-   `web_search` / `web_fetch` 不报 `WEB_PROVIDER_CONFIGURED_MISSING` / `_UNAVAILABLE`。
-2. **填两个 key。** `~/.dsh/.credentials.yaml`（0600）的 `refs:` 段加
-   `TAVILY_API_KEY` 与 `FIRECRAWL_API_KEY`。宿主的凭据界面只管模型供应商的 key，
-   自定义引用名没有按钮，只能手编文件。**注意：DSH 不脱敏工具输出，别在会话里
-   `cat` 这个文件。**
-3. **跑通真实请求。** 一次 `web_search`、一次普通页 `web_fetch`，以及一次反爬/JS 重的页
-   （确认 Tavily 拿不到时能降到 Firecrawl），确认各条路径都走到。
-4. **CI 已就绪但跑不起来。** `.github/workflows/ci.yml` 已提交并推送（`66627ea`），
-   工作流能被 GitHub 接收，但因**账号级 billing lock**（`The job was not started
-   because your account is locked due to a billing issue.`）runner 起不来，与仓库公开
-   与否、与 workflow 配置都无关，需用户处理账号账单。本地等价验证靠
-   `prepublishOnly: npm test`。
-5. **npm 发布已准备好，但搁置。** `package.json` 是 `0.1.0-alpha.0`、`private` 已移除、
-   `files` 白名单已收好（`npm pack --dry-run` 20 文件 / 45 kB，不含 test 与 node_modules）。
-   包名 `dsh-search-fetch-router` 未被占。**卡在登录**：`npm whoami` 仍是 `ENEEDAUTH`，
-   首次登录要邮件 OTP，而当时 Microsoft 365 / Exchange Online 大范围故障导致 OTP 邮件延迟
-   几十分钟。绕路：浏览器开 npmjs.com/settings/~/tokens 生成 **Automation token**（不需
-   OTP），`npm config set //registry.npmjs.org/:_authToken=<token>` 后
-   `pnpm publish --tag alpha --no-git-checks`，用完 revoke。
-   注意：本机 `npm pack --dry-run` 需要 `--cache "$(pwd)/.tmp-npm-cache"`
-   （默认 cache 目录只读，EROFS `/home/slayer/.npm/_cacache/tmp`）。
+1. **真实运行已验证。** 已装进本机 web profile、provider pin 到 `search-fetch-router`；重启后
+   `web_search` / `web_fetch` 均正常，Tavily / Exa / Firecrawl 的 key 已填
+   （`~/.dsh/.credentials.yaml`，0600；DSH 不脱敏工具输出，别在会话里 `cat` 它）。
+2. **CI 已就绪但跑不起来。** `.github/workflows/ci.yml` 已提交并推送，但**账号级 billing lock**
+   让 runner 起不来（`The job was not started because your account is locked due to a billing
+   issue.`），需用户处理账单。本地等价验证靠 `prepublishOnly: npm test`。
+3. **npm 已发布。** `0.2.0-beta.0` 已上线，`dist-tags` 的 `latest` 与 `beta` 都指它，`alpha`
+   是 `0.1.0-alpha.0`；稳定后再发 `0.2.0`。发布/改 tag 都要过网页 EOTP（token 顶不了）；
+   本机 `npm pack --dry-run` 需 `--cache "$(pwd)/.tmp-npm-cache"`（默认 cache 只读，EROFS）。
 
 ## 装 / 卸载到 profile
 
@@ -149,7 +136,7 @@ pnpm install
 
 ## 硬约束（改代码前必读）
 
-`AGENTS.md` 里有完整七条，这里只列最容易踩的：
+`AGENTS.md` 里有完整十五条，这里只列最容易踩的：
 
 - **`available()` 必须恒 `true`。** patch 静态 pin 了 id，被 pin 的 provider 自称不可用
   会硬抛 `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`，不会回落。
