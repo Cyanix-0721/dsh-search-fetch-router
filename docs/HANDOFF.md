@@ -56,7 +56,7 @@
 - 搜索供应商注册表是数据驱动的：`test/execute.test.js` 把一个假 backend 注入
   `createRouter(..., { searchBackends })` 并写进 `providerOrder`，断言它进链并被调用；
   `test/router.test.js` 覆盖 `planSearchChain` 新签名（去重 / 兜底 / 未知 id 跳过）。
-  client `RouterSettingsCard` 的密钥分组由供应商列表驱动（`SEARCH_PROVIDERS` / `KEY_GROUPS`）。
+  client `RouterSettingsCard` 的密钥分组由供应商列表驱动（`lib/client.js` 的 `SEARCH_PROVIDERS`）。
 - 抓取后端同样是数据驱动的（`lib/fetch-backends.js` + `test/fetch-backends.test.js` 契约测试）：
   `lib/execute.js` 的 fetch 循环已无 `if (backend === ...)` 分支，与重构前逐字对齐（既有降级路径测试全过）。
 - 新增可选的 Exa 搜索供应商（keyed，`lib/exa.js`，注册进 `SEARCH_BACKENDS`）；`execute.search` 加了与抓取对称的总预算 `searchTotalBudgetMs`，耗尽抛 `WEB_SEARCH_BUDGET_EXHAUSTED`。

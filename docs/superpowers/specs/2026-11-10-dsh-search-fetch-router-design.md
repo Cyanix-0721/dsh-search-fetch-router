@@ -86,6 +86,12 @@ cannot be installed twice.
 Built-in search providers are `tavily`, `exa` and `firecrawl` (all keyed), with
 `deepseek-official` as the keyless fallback.
 
+Two more controls sit on top of the chain: `enabled` (the composer-bar "搜索增强" switch) — when
+`false` the whole provider list is bypassed (`enabledProviderOrder` returns `[]`), so search falls
+straight through to `deepseek-official` and fetch to local `http`, without touching any third-party
+key; and `maxResultsMode` (`cap` / `provider-max` / `provider-default`) which decides how many results
+each provider is asked for (`requestForBackend`), defaulting to a uniform `maxSearchResults` cap.
+
 #### Adding a search provider
 
 1. Register it in `lib/search-backends.js` — `run(args)`. A keyed backend receives
@@ -93,7 +99,8 @@ Built-in search providers are `tavily`, `exa` and `firecrawl` (all keyed), with
    Add `isAvailable(ctx)` only if it is keyless.
 2. Add its config field(s) in `lib/config.js` (a `…ApiKeyRefs` string array for a keyed one).
 3. The user puts its `id` into `providerOrder`, or config ships it as a default.
-4. `lib/client.js` `KEY_GROUPS` gets one line if it needs a key input in the settings card.
+4. `lib/client.js`'s `SEARCH_PROVIDERS` gets one line (`field` / `base` / `caps` / `maxResults`) so
+   the settings card shows a key input and badge for it.
 
 No change to `lib/execute.js` / `lib/router.js`. `test/execute.test.js` proves it: injecting a
 fake backend into `createRouter(..., { searchBackends })` and listing its id in
@@ -245,7 +252,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
 
 ## Testing
 
-`node --test`, no framework, no build step. 242 tests.
+`node --test`, no framework, no build step. 249 tests.
 
 - `test/router.test.js` — data-driven search chain order (`providerOrder`, including
   dedupe and the official fallback), fetch chain order, escalation signals, budget slicing.
