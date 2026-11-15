@@ -53,8 +53,12 @@ function loadBundle() {
     return seeds[name];
   };
 
+  // Node ≥21 exposes a real globalThis.navigator whose `language` follows the host
+  // (this machine reports zh-CN). translate() falls back to navigator.language when
+  // props.t is absent, so without a pin these assertions would flip to the Chinese
+  // dictionary and fail. Inject a fixed English navigator to keep them locale-stable.
   // eslint-disable-next-line no-new-func
-  new Function('window', 'require', SOURCE)(window, require);
+  new Function('window', 'require', 'navigator', SOURCE)(window, require, { language: 'en' });
   assert.ok(captured, 'client did not call __ModuleLoader__.load');
   return { captured, require };
 }

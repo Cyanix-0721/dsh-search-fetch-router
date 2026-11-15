@@ -5,16 +5,14 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-16
+
 ### Added
 
 - 插件设置卡片新增「最大搜索结果条数」数字框与三个取值方式按钮（`maxResultsMode`）：
   `cap` 用统一上限 `maxSearchResults`（默认）；`provider-max` 按各家自己的硬上限
   （Tavily 20 / Exa 100 / Firecrawl 100）；`provider-default` 不传条数、让各家用自己的默认值。
 - `lib/search-backends.js` 每个搜索后端带上自己的 `maxResults` 硬上限，供 `provider-max` 使用。
-
-### 计划
-
-- 收集 `0.2.0-beta.0` 的反馈，稳定后发布 `0.2.0`。
 
 ### Fixed
 

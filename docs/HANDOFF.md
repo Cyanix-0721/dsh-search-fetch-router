@@ -7,7 +7,7 @@
 插件已实现、已提交、已推到 GitHub，`npm test` 249 全过。已**装进本机 web profile**，provider
 已 pin 到 `search-fetch-router`。**已重启 DSH**，本会话内跑过 `web_search` 与 `web_fetch`
 （`https://example.com`），均正常返回；per-request 命中哪家可开 `verboseLog` 在日志里看。
-已发布到 npm：`0.2.0-beta.0`（`latest` 与 `beta` 都指它，`alpha` 是 `0.1.0-alpha.0`）。
+已发布到 npm：`0.3.0`（`latest` 指它；`beta` 仍是 `0.2.0-beta.0`，`alpha` 是 `0.1.0-alpha.0`）。
 搜索与抓取都已抽象成声明式注册表（`lib/search-backends.js` + `lib/fetch-backends.js`）：
 搜索与抓取共用一张 `providerOrder`（默认 `tavily`→`exa`→`firecrawl`），新增供应商只加注册项与配置字段，执行层不动。
 
@@ -109,9 +109,10 @@
 2. **CI 已就绪但跑不起来。** `.github/workflows/ci.yml` 已提交并推送，但**账号级 billing lock**
    让 runner 起不来（`The job was not started because your account is locked due to a billing
    issue.`），需用户处理账单。本地等价验证靠 `prepublishOnly: npm test`。
-3. **npm 已发布。** `0.2.0-beta.0` 已上线，`dist-tags` 的 `latest` 与 `beta` 都指它，`alpha`
-   是 `0.1.0-alpha.0`；稳定后再发 `0.2.0`。发布/改 tag 都要过网页 EOTP（token 顶不了）；
-   本机 `npm pack --dry-run` 需 `--cache "$(pwd)/.tmp-npm-cache"`（默认 cache 只读，EROFS）。
+3. **npm 已发布。** `0.3.0` 已作为正式版上线，`latest` 指它；`beta` 仍停在 `0.2.0-beta.0`，
+   `alpha` 是 `0.1.0-alpha.0`（旧预发布不删，避免已装 profile 解析失败）。发布/改 tag 都要过
+   网页 EOTP（token 顶不了）；本机 `npm pack --dry-run` 需 `--cache "$(pwd)/.tmp-npm-cache"`
+   （默认 cache 只读，EROFS）。
 
 ## 装 / 卸载到 profile
 
