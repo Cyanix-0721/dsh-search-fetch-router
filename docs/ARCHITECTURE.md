@@ -79,58 +79,15 @@
 | 预算切片 | `lib/router.js` 的 `segmentTimeout` | 总预算是硬上限，单段是上限；剩余不足 `MIN_SEGMENT_BUDGET_MS` 就不再开新段 |
 | 公共 POST | `lib/rest.js` 的 `postJson` | 组合超时、包错误体、挂 `status`/`Retry-After`、**取消原样透传** |
 
-## 文件地图
+## 文件地图与加供应商
 
-```
-index.js                    apply()：只装配，注册 search/fetch 两个 provider
-cordis.patch.yml            bundle patch：mount + 把 web 的两个 provider pin 到本插件 + 提 tool-web 超时
-lib/config.js               schemastery schema（全 .volatile()，零密钥）
-lib/router.js               纯决策：排链、升级判定、预算切片（无 I/O，最好测）
-lib/execute.js              执行层：把决策落到调用上（轮转 key、降级、预算、汇总错误）
-lib/search-backends.js      搜索供应商注册表
-lib/fetch-backends.js       抓取供应商注册表
-lib/tavily.js               Tavily /search 与 /extract 的映射
-lib/exa.js                  Exa /search 与 /contents 的映射
-lib/firecrawl.js            Firecrawl /v2/search 与 /v2/scrape 的映射
-lib/official.js             宿主自带：官方 DeepSeek 搜索 + 本地 HttpFetch 抓取
-lib/rest.js                 三家共用的 JSON POST 底座（超时/错误/取消/UA）
-lib/keyring.js              key 池：轮转、冷却分档、失效判定
-lib/errors.js               稳定错误码与 WebError 包装
-lib/urls.js                 URL 校验
-lib/client.js               零构建浏览器设置卡（供应商排序/停用、改 key 名称）
-```
+- **每个文件干什么、目录结构**：见 `AGENTS.md` 的「目录」。那里跟着改动同步更新，这里不再复制一份（复制就会过时）。
+- **加一个供应商要改哪几处**：见 `AGENTS.md` 的「改代码时」——注册表 + `lib/config.js` 字段 + `lib/client.js` 的 `SEARCH_PROVIDERS` 镜像（这一处最容易漏）。`lib/execute.js` 与 `lib/router.js` 是数据驱动的，一行都不用改。
 
-## 加一个供应商（执行层一行都不用改）
+## 不变量
 
-1. 在 `lib/search-backends.js`（和/或 `lib/fetch-backends.js`）加一项：`id` / `label` /
-   `keyRefsField` / `timeoutField` / `defaultTimeoutMs` / `run`，keyless 再加 `isAvailable`。
-2. 在 `lib/config.js` 加它的 key refs 数组字段与单次超时字段（都 `.volatile()`）。
-3. 让用户把它的 `id` 填进设置里的 `providerOrder`（插件页里就是排序/启用那张卡）。
-
-## 不变量（踩过坑，别退回去）
-
-- **`available()` 恒 `true`**：本 provider 被 patch 静态 pin，自称不可用会硬抛
-  `WEB_PROVIDER_CONFIGURED_UNAVAILABLE`，不会回落。所有真实判断都应在 `search()`/`fetch()` 内部。
-- **`registerSearchProvider` 必须是 `apply()` 里第一条可能失败的效果语句**，否则硬抛
-  `WEB_PROVIDER_CONFIGURED_MISSING`。
-- **patch 里 id-targeted 的 `config` 是整块替换**，不是深合并；两个 provider 字段要一起写。
-- **`tool-web.fetchTimeoutMs` / `searchTimeoutMs` 必须 ≥ 对应的总预算**，否则被工具层腰斩。
-- **密钥永不进 YAML**：配置只存「引用名」，值落 `~/.dsh/.credentials.yaml` 或环境层。
-- **配置枚举一律用 `z.string()` + 使用时规整**：Config 校验抛错会拖垮整个插件加载，
-  而两条链都被 pin 在本插件——一个手改 YAML 的拼写错误就能把 `web_search`/`web_fetch` 一起弄挂。
-- **key 池必须跨调用存活**：池是模块级缓存，按供应商分桶，别每次请求重建。
-- **取消信号原样透传**：`postJson` 不把 `AbortError` 包成普通错误，否则取消会被当成后端失败、
-  惩罚 key、继续降级。
-- **客户端调远端一律先剥 `{ ok, value }` 信封**：`ctx.remote.settings.describe/mutate`、
-  `ctx.remote.credentials.*` 回的是 `{ ok: true, value }`（失败 `{ ok: false, error }`），不是裸数据。
-  把信封当数据 → `findNamespaceView` 取不到视图 → 状态永远读成默认值，**写成功了界面也显示没生效**。
-  一键开关就栽在这里（点一下其实写进磁盘了，却「闪一下又弹回开」）。统一走 `lib/client.js` 的
-  `unwrapRemote()` 剥一层。
-- **`settings.mutate` 只认 volatile 字段**：非 volatile 会抛 `Config field "..." is not volatile`，
-  要能热改（不重启）的配置项必须 `.volatile()`。
-- **ref 名数组一律写整数组，别按索引 `set`/`unset`**：这些数组常常还只是 schema 默认值、没真正
-  落进配置文档；对不存在的数组按下标写会被 `configForms.mutate` 整条拒绝（界面表现为「保存失败」）。
-  添加 / 删除 / 改名都要写整个数组，见 `lib/client.js` 的 `addRef`/`removeRef`/`save`。
+硬约束（踩过坑、别退回去）以 `AGENTS.md` 的十五条为**唯一权威来源**，这里不再重复维护。
+改代码前先读那一份——`README.md` 面向用户，`AGENTS.md` 面向改代码的人，架构叙述看本文。
 
 ## 测试与覆盖
 

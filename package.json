@@ -1,6 +1,6 @@
 {
   "name": "dsh-search-fetch-router",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Declarative web search & fetch router for DeepSeek Harness: one ordered provider list (Tavily / Exa / Firecrawl) with key-pool rotation, single-URL fetch, official/local-http fallback, and credentials-only keys.",
   "type": "module",
   "main": "index.js",
@@ -22,10 +22,15 @@
     "LICENSE"
   ],
   "license": "MIT",
+  "author": "Cyanix-0721",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Cyanix-0721/dsh-search-fetch-router.git"
   },
+  "bugs": {
+    "url": "https://github.com/Cyanix-0721/dsh-search-fetch-router/issues"
+  },
+  "homepage": "https://github.com/Cyanix-0721/dsh-search-fetch-router#readme",
   "keywords": [
     "deepseek",
     "harness",
@@ -44,6 +49,8 @@
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
+    "test:coverage": "node --experimental-test-coverage --test \"test/*.test.js\"",
+    "check": "node --check index.js && node --check lib/client.js && node --check lib/config.js && node --check lib/errors.js && node --check lib/exa.js && node --check lib/execute.js && node --check lib/fetch-backends.js && node --check lib/firecrawl.js && node --check lib/keyring.js && node --check lib/official.js && node --check lib/rest.js && node --check lib/router.js && node --check lib/search-backends.js && node --check lib/tavily.js && node --check lib/urls.js && node --check lib/text.js && node --check lib/cache.js",
     "prepublishOnly": "npm test"
   },
   "dsh": {

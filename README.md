@@ -54,7 +54,7 @@ branch. To add one, touch three places:
 A keyed provider (`keyRefsField` non-null) automatically gets rotation / cooldown / dead-key
 skipping; a keyless one is called once behind `isAvailable`. `lib/execute.js` and
 `lib/router.js` need no change. See the "a newly registered backend is picked up …" test in
-`test/execute.test.js`, which proves it by injecting a registry.
+`test/execute.search.test.js`, which proves it by injecting a registry.
 
 The **API keys** card in the browser bundle renders a provider list from `lib/client.js`
 (`SEARCH_PROVIDERS`); a new keyed provider needs one entry there to show a key input (the
@@ -205,6 +205,11 @@ live.
 | `fetchFallback` | `true` | fall back to local `http` |
 | `firecrawlOnlyMainContent` | `true` | drop nav and footers |
 | `firecrawlMaxAgeMs` | `172800000` | Firecrawl cache TTL, two days |
+| `cacheEnabled` | `true` | in-memory result cache for both search and fetch; a hit skips every provider. Off = bypass |
+| `cacheTtlMs` | `300000` | entry lifetime in ms; `0`/negative falls back to the 5-minute default, and values below 60 s are clamped to 60 s |
+| `cacheMaxEntries` | `100` | max cached entries (LRU); `0` disables the cache |
+| `cacheMaxBytes` | `8000000` | approximate byte ceiling — the oldest entries evict first; `0` means no byte limit |
+| `cacheGeneration` | `0` | logical cache version — "Clear cache" in the card bumps it, invalidating every existing entry at once |
 
 ## Errors
 

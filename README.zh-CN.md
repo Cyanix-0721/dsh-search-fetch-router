@@ -43,7 +43,7 @@
 
 有 key 池的供应商（`keyRefsField` 非空）自动获得轮转 / 冷却 / 失效跳过；无 key 的走
 `isAvailable` 单次调用。`lib/execute.js` 与 `lib/router.js` 都不用改。测试见
-`test/execute.test.js` 里「a newly registered backend is picked up …」——它用注入注册表
+`test/execute.search.test.js` 里「a newly registered backend is picked up …」——它用注入注册表
 证明这一点。
 
 客户端的「API 密钥」卡片由 `lib/client.js` 的供应商列表（`SEARCH_PROVIDERS`）渲染；
@@ -177,6 +177,11 @@ invalid / revoked / expired 字样的，判为永久失效，本进程内不再�
 | `fetchFallback` | `true` | 回落本地 `http` |
 | `firecrawlOnlyMainContent` | `true` | 丢掉导航与页脚 |
 | `firecrawlMaxAgeMs` | `172800000` | Firecrawl 缓存有效期，两天 |
+| `cacheEnabled` | `true` | 搜索与抓取的内存结果缓存；命中就跳过所有供应商。关闭=旁路 |
+| `cacheTtlMs` | `300000` | 条目存活毫秒；`0` 或负数按 5 分钟默认，低于 60 秒的夹到 60 秒 |
+| `cacheMaxEntries` | `100` | 最多缓存条数（LRU）；`0` 等于关闭缓存 |
+| `cacheMaxBytes` | `8000000` | 近似字节上限，超了先淘汰最久未用的；`0` 表示不限字节 |
+| `cacheGeneration` | `0` | 逻辑缓存版本——卡片上的「清空缓存」会 +1，一变就让所有旧条目立刻失效 |
 
 ## 错误
 

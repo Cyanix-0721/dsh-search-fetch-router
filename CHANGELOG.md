@@ -5,6 +5,38 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-17
+
+### Added
+
+- 结果缓存（`lib/cache.js`）：搜索与抓取共用一份进程内 LRU + TTL 缓存，命中即跳过所有供应商。
+  新增 5 个 volatile 字段 `cacheEnabled` / `cacheTtlMs`（下限 60 s，0/负数按 5 分钟默认）/
+  `cacheMaxEntries` / `cacheMaxBytes` / `cacheGeneration`。插件页新增诊断区与「清空缓存」按钮
+  ——按钮把 `cacheGeneration` 加一，旧条目立即不再命中（内存随条数淘汰回收），无需新增 host→client RPC。
+- 按 Unicode 码点截断并清除孤立代理（`lib/text.js` 的 `clampText` / `stripLoneSurrogates`）：
+  所有截断点（`maxBodyChars`、搜索 snippet、错误体细节）改为不切断代理对，避免留下半个 emoji
+  导致下游 JSON 编码异常；执行层出口再对结果做一次递归字符串清洗。
+- 插件页诊断区：只读展示调用链顺序、每家是否配了 key、段超时与缓存设置（纯配置层合成，
+  不新增 RPC、不写配置；运行期命中率与 key 冷却仍只在日志里看）。
+
+### Changed
+
+- 文档重整：`docs/HANDOFF.md` 脱敏为 `docs/MAINTAINING.md`（去掉本机路径、备份文件名等私有信息）；
+  `AGENTS.md` 作为唯一硬约束源；`docs/ARCHITECTURE.md` 的不变量段改为引用它，「文件地图」
+  「加供应商」两段也改为指向 `AGENTS.md`，不再重复维护（复制就会过时）。
+- 测试按模块拆分（`execute` → search / fetch / cache，`client` → card / toggle / helpers），
+  新增 `text` / `cache` / `registry-consistency` 测试。
+- 补齐 `package.json` 元数据（`author` / `bugs` / `homepage`）与 `check` / `test:coverage` 脚本；
+  版本升至 `0.4.0`。
+
+### Fixed
+
+- 缓存写入时深拷贝一份，避免首次调用方改动返回对象时把缓存条目一起改脏。
+- `lib/cache.js` 的字节估算改用 `Buffer.byteLength`（UTF-8 真字节），不再用 UTF-16 码元数——
+  中文内容的 `cacheMaxBytes` 预算原先被低估约三倍。
+- 缓存键构造抽成纯函数（`buildSearchCacheKey` / `buildFetchCacheKey`）并补逐字段覆盖测试，
+  防止将来新增配置忘了并入缓存键（对应 `AGENTS.md` 第 16 条）。
+
 ## [0.3.0] - 2026-11-16
 
 ### Added

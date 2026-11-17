@@ -58,6 +58,10 @@ provider id 是 `search-fetch-router`，搜索与抓取共用（seam 存两张�
 15. **配置里的 ref 名数组一律写整个数组，不要按索引 `set`/`unset`。** 这些数组常常还只是
     schema 默认值、没真正落进配置文档；对不存在的数组按下标写会被 `configForms.mutate`
     整条拒绝（前端表现为「保存失败」）。见 `lib/client.js` 的 `addRef`/`removeRef`/`save`。
+16. **缓存键必须纳入 `cacheGeneration` 与所有影响结果的配置字段。** 清空缓存靠前端把
+    `cacheGeneration` 加一实现「逻辑失效」——它是 `.volatile()` 整数；缓存键漏掉它（或漏掉
+    timeout / depth 等影响结果的字段）就会出现「点了清空、或改了配置，仍命中旧结果」。
+    缓存条目只活在进程内存、不落盘，由 `lib/cache.js` 的 LRU + TTL 回收。
 
 ## 目录
 
@@ -76,8 +80,10 @@ lib/exa.js            /search 与 /contents 的 REST
 lib/firecrawl.js      /v2/scrape 与 /v2/search 的 REST 与响应映射
 lib/official.js       官方 deepseek-official 搜索 + 本地 http 抓取
 lib/errors.js         错误码与 WebError 包装
+lib/text.js           Unicode 安全文本工具：按码点截断 + 清孤立代理 + 递归清洗字符串
+lib/cache.js          进程内结果缓存：LRU + TTL + 字节上限 + cacheSignature
 lib/execute.js        执行层：把决策落到调用上，失败降级
-lib/client.js         零构建浏览器 bundle：设置卡片（填 key / 改 key 名称 / 排序停用 / 最大结果条数三档 / 掩码）＋输入框左侧「搜索增强」启停按钮
+lib/client.js         零构建浏览器 bundle：设置卡片（填 key / 改 key 名称 / 排序停用 / 最大结果条数三档 / 诊断区 + 清空缓存 / 掩码）＋输入框左侧「搜索增强」启停按钮
 test/*.test.js        node --test，无框架依赖
 ```
 
