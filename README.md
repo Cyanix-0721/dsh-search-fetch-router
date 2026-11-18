@@ -101,6 +101,9 @@ npx --yes @deepseek-ai/dsh plugin --profile web add \
 
 Restart DSH afterwards. The bundle patch mounts the plugin and pins both providers.
 
+Prereleases are published under their own npm tag, so `latest` always stays stable. To try one:
+`dsh-search-fetch-router@beta` (or `@alpha` / `@next`).
+
 ## Keys
 
 The plugin reads **reference names**, never values. Two ways to supply a value, both

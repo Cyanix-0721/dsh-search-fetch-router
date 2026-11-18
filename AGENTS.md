@@ -98,6 +98,14 @@ node --check index.js                       # 语法检查
 node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-type=module
 ```
 
+## 发布
+
+打 tag 才发，见 `docs/MAINTAINING.md` 的 Releasing 段。两条不能碰的：
+
+- `publish.yml` 的文件名是 npm trusted publisher 配置的一部分，改名等于发布立刻失效。
+- `npm publish` 只允许在 `publish.yml` 里跑；npm 的 OIDC 校验看的是**调用方** workflow 名，挪进
+  `test.yml` 或被 `workflow_call` 包一层都会对不上。
+
 ## 改代码时
 
 - **决策与执行分开。** 新逻辑先问「这是纯决策吗」——是就进 `lib/router.js`，那里可以

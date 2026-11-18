@@ -5,6 +5,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- 发布流水线 `publish.yml` + 测试闸门 `test.yml`：推 `v*` tag 触发，跑与 PR 相同的 CI 矩阵（`test.yml`
+  以 reusable workflow 复用），校验 tag 与 `package.json` 版本一致、tagged commit 在 `main` 上，然后
+  `npm publish` 并创建 GitHub release。版本号决定 dist-tag：`-alpha` → `alpha`、`-beta` → `beta`、
+  `-rc`/其他预发布 → `next`、正式版 → `latest`；预发布在 GitHub 上标为 prerelease。
+  发布说明取 `CHANGELOG.md` 对应小节，缺失则用 GitHub 自动生成。
+- npm 认证走 **OIDC trusted publishing**，仓库不需要 `NPM_TOKEN` secret；provenance 由 npm 自动生成。
+
+### Changed
+
+- 原 `ci.yml` 拆成两张：`test.yml`（push/PR/`workflow_call` 跑测试，只读权限）与 `publish.yml`
+  （只在 tag 上发布）。宿主包安装只在 `test.yml` 里有一份，发布侧用 `--ignore-scripts` 跳过
+  `prepublishOnly` 的重复测试。
+
 ## [0.4.1] - 2026-11-17
 
 ### Added

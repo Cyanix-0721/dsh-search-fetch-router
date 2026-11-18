@@ -1,0 +1,179 @@
+name: Publish
+
+# Tag-driven publish: `git tag v0.4.2-beta.0 && git push origin v0.4.2-beta.0`.
+# Nothing is published from a branch push — the tag is the only trigger, so a
+# bad merge can never ship. The tag must equal the version in package.json.
+#
+# Prereleases (`-alpha` / `-beta` / `-rc`) go to their own npm dist-tag and are
+# marked as GitHub prereleases; only a plain `vX.Y.Z` moves `latest`.
+#
+# npm auth is OpenID Connect (trusted publishing), not a stored token: this
+# workflow exchanges a short-lived GitHub OIDC token for a publish credential
+# scoped to it. Requires a one-time "Trusted Publisher" setup on the package
+# settings page — owner, repo, and WORKFLOW FILENAME `publish.yml`. Renaming
+# this file breaks publishing until that setting is updated too.
+#
+# workflow_call validation on npm's side checks the CALLING workflow name, so
+# `test.yml` must not be the one running `npm publish` — only this file does.
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # OIDC: npm publish auth + automatic provenance
+
+jobs:
+  # Same matrix as PRs, run on the tagged commit. A red test here aborts before
+  # anything is published. `--ignore-scripts` later skips the `prepublishOnly`
+  # re-run precisely because this job already did it.
+  test:
+    uses: ./.github/workflows/test.yml
+    # The called workflow only needs to read the repo; don't hand it the
+    # workflow-level id-token: write intended for publishing.
+    permissions:
+      contents: read
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `cache:` input, so nothing touches .npmrc — a cached npmrc can shadow
+      # the OIDC setup that makes publishing work. (`package-manager-cache` only
+      # exists on setup-node v5+; this repo stays on v4, where not passing
+      # `cache:` is already the equivalent.)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+
+      - name: Check tag matches package.json version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "publishing $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      # A tag can be pushed from any branch, so the tag name alone proves
+      # nothing about what is being shipped. Require the tagged commit to be an
+      # ancestor of main: "behind" / "identical" means it is on main, "ahead"
+      # means it carries commits main never saw.
+      - name: Check tagged commit is on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$GITHUB_REF_NAME" --jq .status)"
+          echo "compare main...$GITHUB_REF_NAME: $status"
+          case "$status" in
+            behind | identical) ;;
+            *)
+              echo "::error::$GITHUB_REF_NAME is not on main ($status); release from main only"
+              exit 1
+              ;;
+          esac
+
+      # Trusted publishing needs npm >= 11.5.1. An older CLI ignores the OIDC
+      # environment and fails with a bare ENEEDAUTH, which reads like a missing
+      # secret — so fail loudly here instead of at publish time.
+      - name: Check npm supports trusted publishing
+        run: |
+          npm_version="$(npm --version)"
+          echo "npm $npm_version"
+          if ! node -e '
+            const [a, b, c] = process.argv[1].split(".").map(Number);
+            const ok = a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1)));
+            process.exit(ok ? 0 : 1);
+          ' "$npm_version"; then
+            echo "::error::npm $npm_version is too old for trusted publishing (needs >= 11.5.1)"
+            exit 1
+          fi
+
+      # Prereleases go to a prerelease dist-tag, never to `latest` — `latest`
+      # must stay on the stable line users install by default. alpha/beta keep
+      # their own tags; `rc` and anything else follow the host packages'
+      # convention and land on `next`.
+      - name: Resolve npm dist-tag
+        run: |
+          version="$VERSION"
+          case "$version" in
+            *-alpha*) tag=alpha ;;
+            *-beta*)  tag=beta ;;
+            *-*)      tag=next ;;
+            *)        tag=latest ;;
+          esac
+          echo "npm dist-tag: $tag"
+          echo "NPM_DIST_TAG=$tag" >> "$GITHUB_ENV"
+          if [ "$tag" = latest ]; then
+            echo "PRERELEASE=false" >> "$GITHUB_ENV"
+          else
+            echo "PRERELEASE=true" >> "$GITHUB_ENV"
+          fi
+
+      # No NODE_AUTH_TOKEN: the npm CLI detects the OIDC environment and
+      # exchanges the GitHub token itself. No --provenance either — trusted
+      # publishing from a public repo generates the attestation automatically.
+      #
+      # --ignore-scripts skips `prepublishOnly` (→ `npm test`): the `test` job
+      # already ran that exact suite on this commit, and re-running it here would
+      # force a second copy of the host-package install block into this workflow.
+      # A manual `npm publish` outside CI still gets the guard.
+      #
+      # Re-runnable: a release that failed after publishing (e.g. the GitHub
+      # release step) is retried by re-pushing the tag, and re-publishing an
+      # existing version is a hard 403. So skip the publish, keep the release.
+      - name: Publish to npm
+        run: |
+          if npm view "dsh-search-fetch-router@$VERSION" version > /dev/null 2>&1; then
+            echo "$VERSION is already on npm; skipping publish"
+            exit 0
+          fi
+          npm publish --tag "$NPM_DIST_TAG" --ignore-scripts
+
+      # Release notes come from the matching CHANGELOG section when there is one
+      # (that is the text the user already reads); otherwise let GitHub generate
+      # them from the commits since the previous tag.
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="$(mktemp)"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { found = 1; next }
+              found && index($0, "## [") == 1 { exit }
+              found { print }
+            ' CHANGELOG.md | sed -e '/./,$!d' > "$notes"
+          fi
+          if [ -s "$notes" ]; then
+            printf '\n```\nnpm install dsh-search-fetch-router@%s\n```\n' "$NPM_DIST_TAG" >> "$notes"
+            notes_arg=(--notes-file "$notes")
+          else
+            notes_arg=(--generate-notes)
+          fi
+
+          tag_arg=()
+          if [ "$PRERELEASE" = true ]; then
+            tag_arg=(--prerelease)
+          fi
+
+          # Same re-runnability as the publish step: `gh release create` fails
+          # if the release exists, so edit it in place instead.
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "v$VERSION" \
+              "${notes_arg[@]}" "${tag_arg[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "v$VERSION" \
+              --verify-tag \
+              "${notes_arg[@]}" "${tag_arg[@]}"
+          fi

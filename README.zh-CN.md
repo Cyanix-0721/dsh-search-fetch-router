@@ -85,6 +85,9 @@ npx --yes @deepseek-ai/dsh plugin --profile web add \
 
 装完重启 DSH。bundle patch 会把插件挂上并 pin 住两个 provider。
 
+测试版发在单独的 npm tag 上，`latest` 永远是稳定版。想试新版用
+`dsh-search-fetch-router@beta`（或 `@alpha` / `@next`）。
+
 ## 密钥
 
 插件读**引用名**，从不读值。两种填法，都在 YAML 之外：

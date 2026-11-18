@@ -1,10 +1,19 @@
-name: CI
+name: Test
 
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  # Called by publish.yml as the publish gate, so the tag build is tested by
+  # exactly the matrix PRs are. Tags do not match `push.branches`, so a release
+  # does not also fire this workflow separately.
+  workflow_call:
+
+# Read-only: the reusable-workflow call from publish.yml inherits these, so the
+# test job can never touch the repo (the publish job has its own write scope).
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -27,6 +36,9 @@ jobs:
       # depends on `@deepseek-ai/dsh-environment` — a package that has been
       # unpublished, so installing `@latest` fails with E404. The line this
       # plugin targets lives on `next`.
+      #
+      # publish.yml calls this workflow as its publish gate, so it runs the
+      # same install — it does not need its own copy.
       - name: Install host packages for tests
         run: |
           npm install --no-save --no-package-lock --no-audit --no-fund \

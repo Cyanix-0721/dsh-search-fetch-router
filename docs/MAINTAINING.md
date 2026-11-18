@@ -66,6 +66,45 @@ for p in schemastery cordis dsh-web dsh-credentials dsh-launch-environment \
 done
 ```
 
+## Releasing
+
+Releases are tag-driven and automated (`.github/workflows/publish.yml`). Nothing publishes from a branch push.
+
+```bash
+# 1. bump version in package.json + write the CHANGELOG section (the release notes come from it)
+# 2. commit, then tag the commit that bump landed on
+git tag v0.4.2-beta.0        # or v0.4.2 for a stable release
+git push origin v0.4.2-beta.0
+```
+
+The workflow then: runs the full CI matrix on the tagged commit (`test.yml` is reused as the gate), checks the
+tag equals `package.json`'s version, picks a dist-tag, publishes, and creates the GitHub release
+(prerelease flag for prerelease versions).
+
+| version | npm dist-tag | GitHub |
+| --- | --- | --- |
+| `X.Y.Z` | `latest` | release |
+| `X.Y.Z-beta.N` | `beta` | prerelease |
+| `X.Y.Z-alpha.N` | `alpha` | prerelease |
+| `X.Y.Z-rc.N` / anything else | `next` | prerelease |
+
+**npm auth is OIDC (trusted publishing), not a token.** There is no `NPM_TOKEN` secret to rotate. One-time setup
+on npmjs.com → the package → Settings → Trusted Publisher, GitHub Actions:
+owner `Cyanix-0721`, repository `dsh-search-fetch-router`, workflow filename `publish.yml` (filename only, must
+include `.yml`). Requires npm ≥ 11.5.1 on the runner — the workflow checks this and fails early rather than with
+a cryptic `ENEEDAUTH`.
+
+Gotchas:
+
+- Renaming `publish.yml` breaks publishing until the npm setting is updated. The workflow filename is part of the
+  trust relationship and cannot be edited on npm — delete and re-create the publisher entry.
+- A new trusted publisher must complete its first successful publish within 2 days or it expires.
+- `repository.url` in `package.json` must keep matching the GitHub repo (case-sensitive), otherwise provenance
+  generation is rejected.
+- Prereleases never move `latest`. To promote, publish the corresponding stable version.
+- Re-pushing the same tag re-runs the workflow: the npm publish and `gh release` steps are both idempotent, so a
+  failure after a successful publish doesn't need a version bump.
+
 ## Environment gotchas
 
 - `~/.dsh/...` sits outside the default workspace-write sandbox; installing a plugin needs `danger-full-access`.
