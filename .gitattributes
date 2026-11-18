@@ -1,0 +1,13 @@
+# Normalize line endings: let git detect text vs binary, store LF in the repo.
+* text=auto
+
+# Force LF in the working tree too, so a Windows checkout can't reintroduce CRLF
+# and trip the Action runners or scripts/check.mjs. Keep this list to source and
+# config file types; binaries are handled by `* text=auto` above.
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.mjs   text eol=lf
+*.js    text eol=lf
+
+# Keep this file itself LF so the rule set doesn't flip to CRLF on Windows.
+.gitattributes text eol=lf

@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Keep the pinned action majors (checkout / setup-node) current without a
+  # manual bump every few months — this repo went v4 → v7 by hand because
+  # nothing was watching. Grouped so a weekly bump lands as one PR, not one
+  # per action.
+  #
+  # npm is deliberately not tracked: `dependencies` is empty and every runtime
+  # dependency is a `peerDependencies` compatibility range maintained by hand.
+  # Dependabot bumping peer ranges automatically would quietly widen the plugin's
+  # declared host compatibility, which we do not want.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']

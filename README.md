@@ -1,5 +1,7 @@
 # dsh-search-fetch-router
 
+**English** · [简体中文](./README.zh-CN.md)
+
 A [DeepSeek Harness](https://github.com/deepseek-ai/dsh) plugin that takes over `web_search`
 and `web_fetch` with a **Tavily-first** routing chain, escalating to **Firecrawl** when the
 page needs a real browser, and falling back to the host's own providers when nothing else

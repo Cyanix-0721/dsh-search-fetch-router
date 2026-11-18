@@ -4,11 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
   # Called by publish.yml as the publish gate, so the tag build is tested by
   # exactly the matrix PRs are. Tags do not match `push.branches`, so a release
   # does not also fire this workflow separately.
   workflow_call:
+
+# A newer push to the same branch/PR makes the previous run's result irrelevant,
+# so cancel the superseded one. Keyed on github.ref: PRs and branches each get
+# their own group (a tag run is a distinct ref, so it never cancels main).
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 # Read-only: the reusable-workflow call from publish.yml inherits these, so the
 # test job can never touch the repo (the publish job has its own write scope).
@@ -18,15 +26,34 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Cap the wall clock: the host-package install pulls `@next` with no lockfile,
+    # so a stalled registry would otherwise inherit the 360-min default — and
+    # publish.yml reuses this job as its gate, where a stuck run also blocks the
+    # release queue (that workflow keeps cancel-in-progress: false).
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        # 24.9.0 is the host (@deepseek-ai/dsh) engines floor; 26 is the current
+        # LTS. Test both ends — the floor a user might actually be on, and the
+        # newest line — skipping the non-LTS odd majors.
+        node: ['24', '26']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          # Nothing here pushes or commits; keep the token out of .git/config.
+          persist-credentials: false
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      # `npm run check` walks index.js + every lib/*.js (see scripts/check.mjs),
+      # so a newly added file is covered automatically — cheap, and catches a
+      # syntax error in a file the tests never import. Placed before the (slow)
+      # host-package install so a typo fails fast without downloading anything.
+      - name: Syntax check
+        run: npm run check
 
       # The host packages are peer dependencies that DSH itself provides at
       # runtime. CI only needs them so the modules resolve at import time.

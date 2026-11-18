@@ -1,5 +1,7 @@
 # dsh-search-fetch-router
 
+[English](./README.md) · **简体中文**
+
 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) 插件：接管 `web_search` 与
 `web_fetch`，**Tavily 优先**，需要真实浏览器时升级到 **Firecrawl**，都不行再回落宿主
 自己的提供方。

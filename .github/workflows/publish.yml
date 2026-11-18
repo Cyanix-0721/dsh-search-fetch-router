@@ -1,6 +1,6 @@
 name: Publish
 
-# Tag-driven publish: `git tag v0.4.2-beta.0 && git push origin v0.4.2-beta.0`.
+# Tag-driven publish: `git tag v0.5.0-beta.0 && git push origin v0.5.0-beta.0`.
 # Nothing is published from a branch push — the tag is the only trigger, so a
 # bad merge can never ship. The tag must equal the version in package.json.
 #
@@ -41,17 +41,35 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    # Manual approval gate: nothing uploads until a reviewer approves this
+    # environment. Configure it once under Settings → Environments → "npm" with
+    # required reviewers; until that exists GitHub auto-creates an unprotected
+    # environment of this name, so publishing still works — just without a gate.
+    environment: npm
+    # With cancel-in-progress: false, a stuck run makes every re-pushed tag wait
+    # in the queue. Cap the wall clock instead of inheriting the 360-min default.
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # Release auth is GH_TOKEN (env) + npm OIDC, never git credentials;
+          # keep the token out of .git/config.
+          persist-credentials: false
 
-      # No `cache:` input, so nothing touches .npmrc — a cached npmrc can shadow
-      # the OIDC setup that makes publishing work. (`package-manager-cache` only
-      # exists on setup-node v5+; this repo stays on v4, where not passing
-      # `cache:` is already the equivalent.)
-      - uses: actions/setup-node@v4
+      # Deliberately NO `registry-url`. When setup-node is given a registry URL it
+      # writes an .npmrc containing
+      #   //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+      # and npm then treats auth as "already configured" and skips the OIDC
+      # trusted-publishing exchange, failing with a bare ENEEDAUTH / 404 (the npm
+      # version guard below passes, so the real cause is hidden). The default npm
+      # registry is already npmjs.org, so omitting it costs nothing — OIDC auth
+      # and automatic provenance still work. `package-manager-cache: false`
+      # additionally keeps setup-node v7's now-default caching from leaving stale
+      # npm state on a release runner.
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Check tag matches package.json version
         run: |

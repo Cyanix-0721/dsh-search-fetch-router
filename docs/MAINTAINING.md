@@ -73,8 +73,8 @@ Releases are tag-driven and automated (`.github/workflows/publish.yml`). Nothing
 ```bash
 # 1. bump version in package.json + write the CHANGELOG section (the release notes come from it)
 # 2. commit, then tag the commit that bump landed on
-git tag v0.4.2-beta.0        # or v0.4.2 for a stable release
-git push origin v0.4.2-beta.0
+git tag v0.5.0-beta.0        # or v0.5.0 for a stable release
+git push origin v0.5.0-beta.0
 ```
 
 The workflow then: runs the full CI matrix on the tagged commit (`test.yml` is reused as the gate), checks the
@@ -94,6 +94,11 @@ owner `Cyanix-0721`, repository `dsh-search-fetch-router`, workflow filename `pu
 include `.yml`). Requires npm ≥ 11.5.1 on the runner — the workflow checks this and fails early rather than with
 a cryptic `ENEEDAUTH`.
 
+**Publishing is gated by a GitHub Environment.** The `publish` job runs in the `npm` environment, so after the
+tag build you get a manual approval before anything uploads. Configure it once under repo Settings →
+Environments → `npm` → Required reviewers. Until then GitHub auto-creates an unprotected environment of that
+name, so publishing still works — just without the gate.
+
 Gotchas:
 
 - Renaming `publish.yml` breaks publishing until the npm setting is updated. The workflow filename is part of the
@@ -104,6 +109,13 @@ Gotchas:
 - Prereleases never move `latest`. To promote, publish the corresponding stable version.
 - Re-pushing the same tag re-runs the workflow: the npm publish and `gh release` steps are both idempotent, so a
   failure after a successful publish doesn't need a version bump.
+- **Never add `registry-url` to `actions/setup-node`.** Giving setup-node a registry URL writes an `.npmrc` line
+  `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`; npm then treats auth as already configured and skips the
+  OIDC exchange, so a publish fails with `ENEEDAUTH`/404 even with trusted publishing set up. The default npm
+  registry is already npmjs.org, so the input is unnecessary.
+- Treat tags as immutable: never force-move or reuse a tag name. The GitHub release is keyed by the tag and the
+  `gh release edit` path does not move an existing release's target, so re-pointing a tag leaves the release
+  attached to the old commit. To fix a bad release, bump the version and push a new tag.
 
 ## Environment gotchas
 

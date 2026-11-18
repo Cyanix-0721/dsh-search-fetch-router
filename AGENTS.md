@@ -84,6 +84,7 @@ lib/text.js           Unicode 安全文本工具：按码点截断 + 清孤立�
 lib/cache.js          进程内结果缓存：LRU + TTL + 字节上限 + cacheSignature
 lib/execute.js        执行层：把决策落到调用上，失败降级
 lib/client.js         零构建浏览器 bundle：设置卡片（填 key / 改 key 名称 / 排序停用 / 最大结果条数三档 / 诊断区 + 清空缓存 / 掩码）＋输入框左侧「搜索增强」启停按钮
+scripts/check.mjs     跨平台语法检查：遍历 index.js + lib/*.js（`npm run check` 用它，新增 lib 文件自动纳入）
 test/*.test.js        node --test，无框架依赖
 ```
 
@@ -94,7 +95,8 @@ test/*.test.js        node --test，无框架依赖
 ```bash
 npm test                                    # node --test，全部
 node --test test/router.test.js             # 单文件
-node --check index.js                       # 语法检查
+npm run check                               # 语法检查：遍历 index.js + lib/*.js（跨平台）
+node --check index.js                       # 单文件语法检查
 node -e "const m=await import('./index.js'); console.log(m.Config({}))" --input-type=module
 ```
 

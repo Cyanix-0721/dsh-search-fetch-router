@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.5.0-beta.0] - 2026-11-18
+
 ### Added
 
 - 发布流水线 `publish.yml` + 测试闸门 `test.yml`：推 `v*` tag 触发，跑与 PR 相同的 CI 矩阵（`test.yml`
@@ -19,6 +21,23 @@
 - 原 `ci.yml` 拆成两张：`test.yml`（push/PR/`workflow_call` 跑测试，只读权限）与 `publish.yml`
   （只在 tag 上发布）。宿主包安装只在 `test.yml` 里有一份，发布侧用 `--ignore-scripts` 跳过
   `prepublishOnly` 的重复测试。
+- CI 硬化与提速：`test.yml` 加 `concurrency`（同一 ref 的新跑取消旧跑）与 `npm run check` 语法检查步骤；
+  `publish.yml` 的 publish job 加 `timeout-minutes: 15`；`actions/checkout` / `actions/setup-node` 升到 `v7`，
+  并以 `package-manager-cache: false` 关闭 setup-node v7 默认开启的缓存。
+- Node 基线对齐宿主：`package.json` 的 `engines.node` 由 `^22.19.0 || >=24.0.0` 收紧为 `>=24.9.0`
+  （`@deepseek-ai/dsh` 自 `0.2.2-rc.1` 起即为 `>=24.9.0`），CI 矩阵由 `22/24` 改为 `24/26`
+  （最低支持线 + 当前 LTS）。
+- CI 打磨：`test` job 加 `timeout-minutes: 10`；两处 `actions/checkout` 设 `persist-credentials: false`；
+  `pull_request` 限定 `branches: [main]`；`npm run check` 改为跨平台遍历 `scripts/check.mjs`（不再手写
+  文件清单，新增 `lib/*.js` 自动纳入）；`publish` job 加 `environment: npm` 人工审批门；新增
+  `.github/dependabot.yml` 每周自动升级 GitHub Actions。
+
+### Fixed
+
+- **首次发布必然失败的 npm 认证问题**：`publish.yml` 去掉了 `setup-node` 的 `registry-url`。该输入会让
+  setup-node 写出含 `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` 的 `.npmrc`，npm 便认为已配置
+  auth 而跳过 OIDC 交换，trusted publishing 会报 `ENEEDAUTH`/404。npm 默认 registry 本就是 npmjs.org，
+  删除后 OIDC 与自动 provenance 照常。
 
 ## [0.4.1] - 2026-11-17
 

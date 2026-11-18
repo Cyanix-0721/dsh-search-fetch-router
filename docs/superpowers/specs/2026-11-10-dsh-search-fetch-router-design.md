@@ -290,7 +290,7 @@ effect statement in `apply()` and `registerFetchProvider` is wrapped in `try`.
   chain and is called, with no code branch to add. The fetch chain dispatches through its own
   registry the same way, with every pre-registry degradation path preserved exactly.
 
-CI runs on Node 22 and 24, installing host packages from the `next` dist-tag (the `latest`
+CI runs on Node 24 and 26, installing host packages from the `next` dist-tag (the `latest`
 tag still points at the broken 0.0.1-rc.1 line, which depends on the unpublished
 `@deepseek-ai/dsh-environment`).
 
