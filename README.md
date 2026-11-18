@@ -32,8 +32,8 @@ nothing usable — it errored, returned an empty body, or (Tavily) `failed_resul
 a body shorter than `minContentChars`. There is deliberately no "content looks incomplete"
 heuristic; guessing costs credits on pages that were already fine.
 
-Anything fancier — multi-page crawl, anti-bot, structured extraction — is not this plugin's
-job. Use the firecrawl MCP tools for that.
+Anything fancier — multi-page crawl, anti-bot, structured extraction — is outside this plugin's
+scope; for those, the firecrawl MCP tools are the recommendation.
 
 Every fetch runs under one hard budget (`totalBudgetMs`, default 45 s). Each provider gets
 `min(its own timeout, whatever is left)`; when less than 2 s remains, no new provider starts.
@@ -87,9 +87,15 @@ Fetch backends are **declaratively registered** in `lib/fetch-backends.js` and s
 
 ## Install
 
+Requires Node ≥ 24.9.0 — the same floor the DSH host (`@deepseek-ai/dsh` ≥ 0.2.2-rc.1) enforces.
+
 Install into a DSH profile — from npm (`dsh-search-fetch-router@latest`) or straight from the repository:
 
 ```bash
+# from npm (append @beta / @alpha / @next for a prerelease)
+npx --yes @deepseek-ai/dsh plugin --profile web add dsh-search-fetch-router
+
+# from the repository
 npx --yes @deepseek-ai/dsh plugin --profile web add \
   github:Cyanix-0721/dsh-search-fetch-router
 ```

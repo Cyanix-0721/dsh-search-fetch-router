@@ -4,7 +4,7 @@ For the next agent taking over this repo. The user-facing docs are `README.zh-CN
 
 ## At a glance
 
-As of `0.4.0` the plugin is implemented and published; see `CHANGELOG.md` for what changed when. Search and fetch are both declarative registries (`lib/search-backends.js` + `lib/fetch-backends.js`).
+As of `0.5.0` the plugin is implemented and published (current stable `latest` is `0.5.0`); see `CHANGELOG.md` for what changed when. Search and fetch are both declarative registries (`lib/search-backends.js` + `lib/fetch-backends.js`).
 
 - Repository: `https://github.com/Cyanix-0721/dsh-search-fetch-router`
 - Default branch: `main` (track `origin/main`)
@@ -22,7 +22,7 @@ Keys never go into any YAML — config stores only credential **reference names*
 
 ## Verification status
 
-At `0.4.0`: `npm test` is green (`node --test`, no framework dependency) and `node --check` is clean on every source file — but run the suite yourself rather than trusting this line. The invariants that can silently break are locked by tests under `test/`: assembly in `test/index.test.js`, the registry-driven chains in `test/execute.search.test.js` / `test/fetch-backends.test.js`, and cache keys in `test/cache.test.js`.
+At `0.5.0`: `npm test` is green (`node --test`, no framework dependency) and `npm run check` (runs `node --check` over `index.js` + every `lib/*.js` via `scripts/check.mjs`) is clean — but run the suite yourself rather than trusting this line. The invariants that can silently break are locked by tests under `test/`: assembly in `test/index.test.js`, the registry-driven chains in `test/execute.search.test.js` / `test/fetch-backends.test.js`, and cache keys in `test/cache.test.js`.
 
 Not yet verified / next-stage:
 
@@ -91,13 +91,15 @@ tag equals `package.json`'s version, picks a dist-tag, publishes, and creates th
 **npm auth is OIDC (trusted publishing), not a token.** There is no `NPM_TOKEN` secret to rotate. One-time setup
 on npmjs.com → the package → Settings → Trusted Publisher, GitHub Actions:
 owner `Cyanix-0721`, repository `dsh-search-fetch-router`, workflow filename `publish.yml` (filename only, must
-include `.yml`). Requires npm ≥ 11.5.1 on the runner — the workflow checks this and fails early rather than with
-a cryptic `ENEEDAUTH`.
+include `.yml`), **Environment name `npm`** (must match the `environment:` the `publish` job runs under, or the
+OIDC exchange is rejected). Requires npm ≥ 11.5.1 on the runner — the workflow checks this and fails early rather
+than with a cryptic `ENEEDAUTH`.
 
 **Publishing is gated by a GitHub Environment.** The `publish` job runs in the `npm` environment, so after the
 tag build you get a manual approval before anything uploads. Configure it once under repo Settings →
-Environments → `npm` → Required reviewers. Until then GitHub auto-creates an unprotected environment of that
-name, so publishing still works — just without the gate.
+Environments → `npm` → Required reviewers. (This repo already has `npm` set up with a required reviewer.) If a
+fork or rename skips this, GitHub auto-creates an unprotected environment of that name, so publishing still works
+— just without the gate.
 
 Gotchas:
 
@@ -116,6 +118,10 @@ Gotchas:
 - Treat tags as immutable: never force-move or reuse a tag name. The GitHub release is keyed by the tag and the
   `gh release edit` path does not move an existing release's target, so re-pointing a tag leaves the release
   attached to the old commit. To fix a bad release, bump the version and push a new tag.
+- After a successful `npm publish` the new version sits in npm's **automated review**: the package page shows it as
+  `Validating`, `registry.npmjs.org/<pkg>/<version>` returns 404, and the dist-tag has not moved yet. This is normal
+  — wait until it flips to `Published` (then `beta`/`latest` updates itself). Don't re-run the workflow: the same
+  version can't be republished (409).
 
 ## Environment gotchas
 

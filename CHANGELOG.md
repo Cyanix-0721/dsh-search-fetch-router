@@ -5,7 +5,9 @@
 
 ## [Unreleased]
 
-## [0.5.0-beta.0] - 2026-11-18
+## [0.5.0] - 2026-11-18
+
+正式版；即 `0.5.0-beta.0` 的毕业发布，相对 beta 无功能变化。
 
 ### Added
 
@@ -38,6 +40,9 @@
   setup-node 写出含 `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` 的 `.npmrc`，npm 便认为已配置
   auth 而跳过 OIDC 交换，trusted publishing 会报 `ENEEDAUTH`/404。npm 默认 registry 本就是 npmjs.org，
   删除后 OIDC 与自动 provenance 照常。
+- 文档校对：`ARCHITECTURE.md` 不再写死硬约束条数（之前停在「十五条」，实际已 16 条）；`MAINTAINING.md`
+  的版本与语法检查命令更新为现状（`npm run check`），补上 npm trusted publisher 必须填的
+  `Environment name`，并记录发布后 npm `Validating` 自动审核这一观察点。
 
 ## [0.4.1] - 2026-11-17
 

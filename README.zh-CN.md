@@ -25,7 +25,7 @@
 `failed_results` 非空、正文短于 `minContentChars`。**刻意不做**「内容看起来不完整」这种猜测，
 猜错就是白花额度。
 
-再花哨的——整站爬、反爬、结构化抽取——不是本插件的活，走 firecrawl MCP。
+再花哨的——整站爬、反爬、结构化抽取——不在本插件的范围内；这类需求建议走 firecrawl MCP。
 
 每次抓取跑在一个硬预算下（`totalBudgetMs`，默认 45 秒）。每段拿
 `min(自己的超时, 剩余预算)`；剩余不足 2 秒就不再开新段。
@@ -71,9 +71,15 @@
 
 ## 安装
 
+前置要求：Node ≥ 24.9.0——与 DSH 宿主（`@deepseek-ai/dsh` ≥ 0.2.2-rc.1）要求的下限一致。
+
 装进 DSH profile——从 npm（`dsh-search-fetch-router@latest`）或直接从仓库：
 
 ```bash
+# 从 npm 装（测试版加 @beta / @alpha / @next）
+npx --yes @deepseek-ai/dsh plugin --profile web add dsh-search-fetch-router
+
+# 从仓库装
 npx --yes @deepseek-ai/dsh plugin --profile web add \
   github:Cyanix-0721/dsh-search-fetch-router
 ```
